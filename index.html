@@ -603,6 +603,15 @@ function rmsChart(rms){
   const dots=rms.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.2" fill="#0d9488"/><text x="${x(i).toFixed(1)}" y="${(y(p.v)-6).toFixed(1)}" font-size="8.5" text-anchor="middle" fill="#0f766e">${p.v}</text><text x="${x(i).toFixed(1)}" y="${H-6}" font-size="8.5" text-anchor="middle" fill="#687787">${p.l}</text>`).join("");
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:400px"><polyline points="${pts}" fill="none" stroke="#0d9488" stroke-width="2.2"/>${dots}</svg>`;
 }
+function tcase(s){ return String(s||'').toLowerCase().trim().split(/\s+/).map(w=>/\d/.test(w)?w.toUpperCase():w).join(' ').replace(/^./,c=>c.toUpperCase()); }
+function developTermo(defecto, act){
+  let d=(defecto||'').trim();
+  if(!d) return '';
+  let out = /no se detectan/i.test(d) ? 'No se detectan anomalías térmicas.' : (tcase(d).replace(/[.;]+$/,'')+'.');
+  const a=(act||'').trim();
+  if(a && !/no se detectan/i.test(d)) out += ' Se recomienda '+a.toLowerCase().replace(/[.;]+$/,'')+'.';
+  return out;
+}
 function renderMachineTermo(c,p,m){
   const anomalia = m.defecto && m.defecto.toUpperCase().indexOf('NO SE DETECTAN')<0;
   const gcol=g=>g>=7?'#d23b3b':g>=5?'#e08a00':g>=3?'#b8860b':'#2f6f52';
@@ -628,12 +637,13 @@ function renderMachineTermo(c,p,m){
     ${imgs}
     <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Diagnóstico</b>
       <div style="margin-top:8px;font-size:13px;line-height:1.8">
-        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0"><span>Descripción del defecto</span><b style="color:${anomalia?'#b06f00':'#2f6f52'}">${m.defecto||'—'}</b></div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0"><span>Descripción del defecto</span><b style="color:${anomalia?'#b06f00':'#2f6f52'}">${tcase(m.defecto)||'—'}</b></div>
         <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0"><span>Temperatura máxima / ambiente</span><b>${m.tmax} °C${m.tamb?' / '+m.tamb+' °C':''}</b></div>
-        ${m.act?`<div style="display:flex;justify-content:space-between;padding:7px 0"><span>Actuación recomendada</span><b style="color:#b06f00">${m.act}</b></div>`:'<div style="padding:7px 0;color:var(--muted)">Sin actuación requerida</div>'}
+        ${m.act?`<div style="display:flex;justify-content:space-between;padding:7px 0"><span>Actuación recomendada</span><b style="color:#b06f00">${tcase(m.act)}</b></div>`:'<div style="padding:7px 0;color:var(--muted)">Sin actuación requerida</div>'}
       </div>
       <p style="font-size:11.5px;color:var(--muted);font-style:italic;margin:10px 0 0">Nota: la severidad en termografía combina la temperatura, el gradiente térmico y el tipo de componente afectado; no depende solo de la temperatura absoluta.</p>
     </div>
+    ${developTermo(m.defecto,m.act)?`<div style="font-size:13px;color:#2b3845;margin-top:14px;background:#f3f7fb;border-left:4px solid var(--steel);border-radius:8px;padding:12px 14px;line-height:1.6"><b style="color:var(--navy)">Nota del analista</b><div style="margin-top:4px">${developTermo(m.defecto,m.act)}</div></div>`:''}
     ${(m.evo&&m.evo.length>=2)?`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Evolución (últimas ${m.evo.length} medidas)</b>
       <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">${m.evo.some(e=>e.g!=null)?'Grado de severidad y temperatura máxima':'Temperatura máxima'} del cuadro en sus últimas inspecciones. No todos los cuadros se miden cada campaña.</p>
       ${termoEvo(m.evo)}
@@ -729,6 +739,14 @@ function calcMej(ms){
       if(last<peak)year.push({m:m.name,de:peak,a:last});}});
   return {ult,year};
 }
+function qNum(q){
+  const M={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,set:8,oct:9,nov:10,dic:11};
+  const s=String(q||'').toLowerCase().replace(/\s+/g,'');
+  const mm=s.slice(0,3); let y=parseInt((s.match(/\d+/)||['0'])[0],10);
+  if(y<100) y+=2000;
+  const mi=(M[mm]!=null)?M[mm]:0;
+  return y*12+mi;
+}
 function bundle(ms,kind){
   const n={bueno:0,seg:0,alerta:0,peligro:0,mant:0};
   ms.forEach(m=>{n[m.state]=(n[m.state]||0)+1;});
@@ -737,6 +755,7 @@ function bundle(ms,kind){
   const acc=ms.filter(m=>m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0 && m.recomendacion.toUpperCase().indexOf('NO SE DETECTAN')<0 && m.grade>=3);
   // bars from evo
   const labels=[]; ms.forEach(m=>(m.evo||[]).forEach(e=>{if(labels.indexOf(e.q)<0)labels.push(e.q);}));
+  labels.sort((a,b)=>qNum(a)-qNum(b));
   const bars=labels.slice(-6).map(q=>{const o={label:q,bueno:0,seg:0,alerta:0,peligro:0};ms.forEach(m=>{const e=(m.evo||[]).find(x=>x.q===q);if(e){o[stG(e.g)]++;}});return o;});
   // byfen
   const fc={};
@@ -1025,6 +1044,12 @@ function developNote(raw, rec){
     if(!/[.!?]$/.test(s)) s+='.';
     return s;
   });
+  // descartar una última frase cortada del informe (acaba en preposición/artículo/conjunción)
+  if(dev.length){
+    const danglers=/\b(en|de|del|la|el|los|las|un|una|unos|unas|y|o|u|con|a|al|para|por|que|se|su|sus|lo|le|como|sobre|entre|desde|hasta|segun|mas|más)\.?$/i;
+    const last=dev[dev.length-1].replace(/[.!?]+$/,'').trim();
+    if(danglers.test(last)) dev.pop();
+  }
   let out=dev.join(' ');
   if(rec){ const R=rec.trim().replace(/\.$/,''); if(R && !/NO REQUIERE|NO SE DETECT/i.test(R)){ out += (out?' ':'') + 'Se recomienda '+R.toLowerCase()+'.'; } }
   return out.trim();
