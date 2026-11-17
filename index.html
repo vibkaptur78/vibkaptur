@@ -280,13 +280,19 @@ const AVISO_TECNICOS=['tecnico1@ingenorsistemas.com','tecnico2@ingenorsistemas.c
 const AVISO_CC=['administracion@ingenorsistemas.com'];
 /* Envío de avisos por correo. La API key de Brevo vive en el servidor (aviso.php), NUNCA aquí.
    Cuando el relay esté subido al VPS, poner BREVO.ready=true y el envío se activa solo. */
-const BREVO={ endpoint:'/api/aviso.php', ready:false };
+const BREVO={ endpoint:'/api/aviso.php', ready:true };
 function sendAviso(payload){
-  // payload: {to,toName,subject,corregido,revisar,planta,tecnica,periodo}
+  // payload: {type:'review'|'client', subject, html, to?}
   if(!BREVO.ready) return Promise.resolve({simulated:true});
   return fetch(BREVO.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(Object.assign({cc:AVISO_CC},payload))})
-    .then(r=>r.ok?r.json():Promise.reject(r.status)).catch(e=>({error:e}));
+    body:JSON.stringify(payload)})
+    .then(r=>r.ok?r.json():r.text().then(t=>({error:r.status,detail:t}))).catch(e=>({error:String(e)}));
+}
+/* Construye el HTML del aviso de revisión (correo al equipo técnico + Pedro). */
+function buildReviewEmailHtml(R){
+  const li=a=>a.map(x=>`<li>${x}</li>`).join('');
+  const corr=R.corregido.length?`<p style="margin:10px 0 4px"><b>Corregido automáticamente:</b></p><ul>${li(R.corregido.map(c=>c.t+': '+c.d))}</ul>`:`<p style="margin:10px 0 4px"><b>Corregido automáticamente:</b> nada, texto limpio.</p>`;
+  return `<div style="font-family:Arial,sans-serif;max-width:560px"><div style="background:#0d2d46;color:#fff;padding:12px 16px;font-weight:bold">INGENOR · VIBKAPTUR — Revisión de informe</div><div style="padding:16px 18px;color:#333"><p>Hola,</p><p>Informe de <b>${R.planta}</b> (${R.tecnica}, ${R.periodo}) subido a la plataforma. ${R.revisar.length?('Publicación con '+R.revisar.length+' punto(s) a revisar.'):'Publicación correcta, sin errores.'}</p>${corr}<p style="margin:12px 0 4px"><b>Para que revises:</b></p><ol>${li(R.revisar.map(w=>w.t+': '+w.d))||'<li>Nada pendiente.</li>'}</ol><p>Cuando des el OK, se publica y le llega el aviso al cliente.</p><p>— VIBKAPTUR · revisión automática</p></div></div>`;
 }
 function saveContacts(){ try{localStorage.setItem('ingenor_contacts',JSON.stringify(CONTACTS));}catch(e){} }
 let DLSTATS=(function(){ try{const v=localStorage.getItem('ingenor_dl'); if(v) return JSON.parse(v);}catch(e){} return {}; })();
@@ -1529,12 +1535,13 @@ function showReviewAviso(R){
 }
 function tecnicoApprove(){
   const R=REVIEW_DEMO;
-  sendAviso({toName:R.tecnico.n,subject:'Revisión VIBKAPTUR · '+R.planta,corregido:R.corregido,revisar:R.revisar,planta:R.planta,tecnica:R.tecnica,periodo:R.periodo})
+  const subject=`Revisión VIBKAPTUR · ${R.planta} (${R.tecnica}, ${R.periodo}) · ${R.revisar.length?R.revisar.length+' punto(s) a revisar':'correcto'}`;
+  sendAviso({type:'review',subject:subject,html:buildReviewEmailHtml(R)})
     .then(res=>{
       closeModal();
       if(res&&res.simulated) toast('Informe aprobado y publicado. Aviso preparado (el envío real se activa al conectar Brevo).');
-      else if(res&&res.error) toast('Informe publicado. El aviso no se pudo enviar ahora; revisa la conexión con Brevo.');
-      else toast('Informe aprobado y publicado. Aviso enviado al técnico con copia a Pedro y administración. ✓');
+      else if(res&&res.error) toast('Informe publicado. El aviso no se pudo enviar ahora (revisa el relay del servidor).');
+      else toast('Informe aprobado y publicado. Aviso enviado al equipo técnico y a Pedro, con copia a administración. ✓');
     });
 }
 
