@@ -401,6 +401,7 @@ const USERS=[
   {email:"admin@ingenorsistemas.com",   pass:"Ingenor-Admin-26",   role:"admin",  name:"Ingenor · Administrador", canUpload:true,  canDownload:true},
   {email:"tecnico@ingenorsistemas.com", pass:"Ingenor-Tecnico-26", role:"tecnico",name:"Ingenor · Técnico",        canUpload:true,  canDownload:false},
   {email:"pedro.ortega@ingenorsistemas.com", pass:"pedro2026", role:"admin",  name:"Pedro Ortega · Ingenor", canUpload:true, canDownload:true},
+  {email:"administracion@ingenorsistemas.com", pass:"admin2026", role:"admin", name:"Administración · Ingenor", canUpload:false, canDownload:true},
   {email:"tecnico1@ingenorsistemas.com", pass:"tecnico1", role:"tecnico", name:"Técnico 1 · Ingenor", canUpload:true, canDownload:false},
   {email:"tecnico2@ingenorsistemas.com", pass:"tecnico2", role:"tecnico", name:"Técnico 2 · Ingenor", canUpload:true, canDownload:false},
   {email:"tecnico3@ingenorsistemas.com", pass:"tecnico3", role:"tecnico", name:"Técnico 3 · Ingenor", canUpload:true, canDownload:false},
@@ -1637,7 +1638,7 @@ function renderTecnicas(){
   </main>`;
 }
 function dlBtn(label){label=label||'Descargar';
-  if(session&&session.canDownload===false) return `<span class="btn ghost sm" style="opacity:.5;cursor:not-allowed" title="Los técnicos solo suben informes, no los descargan">🔒 Sin descarga</span>`;
+  if(session&&session.canDownload===false) return `<span class="btn ghost sm" style="opacity:.6;cursor:not-allowed" title="El informe solo lo descarga el cliente (y administración)">🔒 Descarga exclusiva del cliente</span>`;
   return `<button class="btn ghost sm" onclick="doDownload()">${label}</button>`;
 }
 function toast(msg){
