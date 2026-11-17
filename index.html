@@ -276,7 +276,8 @@ const CONTACTS_DEFAULT={
 };
 let CONTACTS=(function(){ try{const v=localStorage.getItem('ingenor_contacts'); if(v) return JSON.parse(v);}catch(e){} return JSON.parse(JSON.stringify(CONTACTS_DEFAULT)); })();
 let uploadCid='elis';
-const AVISO_CC=['pedro.ortega@ingenorsistemas.com','administracion@ingenorsistemas.com'];
+const AVISO_TECNICOS=['tecnico1@ingenorsistemas.com','tecnico2@ingenorsistemas.com','tecnico3@ingenorsistemas.com','tecnico4@ingenorsistemas.com','pedro.ortega@ingenorsistemas.com'];
+const AVISO_CC=['administracion@ingenorsistemas.com'];
 /* Envío de avisos por correo. La API key de Brevo vive en el servidor (aviso.php), NUNCA aquí.
    Cuando el relay esté subido al VPS, poner BREVO.ready=true y el envío se activa solo. */
 const BREVO={ endpoint:'/api/aviso.php', ready:false };
@@ -393,6 +394,11 @@ function renderLogin(){
 const USERS=[
   {email:"admin@ingenorsistemas.com",   pass:"Ingenor-Admin-26",   role:"admin",  name:"Ingenor · Administrador", canUpload:true,  canDownload:true},
   {email:"tecnico@ingenorsistemas.com", pass:"Ingenor-Tecnico-26", role:"tecnico",name:"Ingenor · Técnico",        canUpload:true,  canDownload:false},
+  {email:"pedro.ortega@ingenorsistemas.com", pass:"pedro2026", role:"admin",  name:"Pedro Ortega · Ingenor", canUpload:true, canDownload:true},
+  {email:"tecnico1@ingenorsistemas.com", pass:"tecnico1", role:"tecnico", name:"Técnico 1 · Ingenor", canUpload:true, canDownload:false},
+  {email:"tecnico2@ingenorsistemas.com", pass:"tecnico2", role:"tecnico", name:"Técnico 2 · Ingenor", canUpload:true, canDownload:false},
+  {email:"tecnico3@ingenorsistemas.com", pass:"tecnico3", role:"tecnico", name:"Técnico 3 · Ingenor", canUpload:true, canDownload:false},
+  {email:"tecnico4@ingenorsistemas.com", pass:"tecnico4", role:"tecnico", name:"Técnico 4 · Ingenor", canUpload:true, canDownload:false},
   {email:"direccion@otua.com", pass:"Otua-Director-26", role:"client", clientId:"otua",            name:"OTUA", puesto:"Dirección",            canDownload:true},
   {email:"zabaldea@otua.com",  pass:"Otua-Zabaldea-26", role:"client", clientId:"otua", plantId:"zabaldea", name:"OTUA", puesto:"Jefe de planta", canDownload:true},
   {email:"refial@otua.com",    pass:"Otua-Refial-26",   role:"client", clientId:"otua", plantId:"refial",   name:"OTUA", puesto:"Jefe de planta", canDownload:true},
@@ -424,11 +430,15 @@ function scopedPlants(c){ if(!c||!c.plants) return []; return (session && sessio
 function logout(){ try{localStorage.removeItem('vibk_session');}catch(e){} session=null; go({name:"plants"}); }
 
 /* ============================================================= HEADER */
+function staff(){ return !!session && (session.role==='admin'||session.role==='tecnico'); }
 function renderHeader(){
   const isAdmin=session.role==="admin";
   const isTec=session.role==="tecnico";
   const nav=isTec
     ? `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Plantas</a>
+       <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
+       <a onclick="go({name:'dash'})" class="${view.name==='dash'?'active':''}">Análisis</a>
+       <a onclick="go({name:'stats'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>
        <a onclick="go({name:'upload'})" class="${view.name==='upload'?'active':''}">Subir informe</a>`
     : isAdmin
     ? `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Plantas</a>
@@ -481,7 +491,7 @@ function renderPlantsAdmin(){
   const groups=[...DATA.clients].sort((a,b)=>a.name.localeCompare(b.name,'es'));
   let out=`<main>`;
   out+=plantsHero('Plantas de clientes','Entra en un cliente para ver sus plantas. Busca por nombre; están en orden alfabético.');
-  out+=adminBanner("Estás viendo la plataforma como Ingenor: puedes editar estados, subir informes y gestionar accesos.");
+  out+=adminBanner(session.role==='tecnico'?"Como técnico: elige el cliente para subir su informe, y puedes consultar su análisis y estadísticas (sin descarga).":"Estás viendo la plataforma como Ingenor: puedes editar estados, subir informes y gestionar accesos.");
   out+=`<input class="lfilter" placeholder="Buscar cliente…" oninput="filterRows(this)">`;
   out+=`<div class="card lwrap">`;
   groups.forEach(c=>{const n=aggStates(c);
@@ -492,7 +502,7 @@ function renderPlantsAdmin(){
   return out;
 }
 function renderPlants(){
-  if(session.role==="admin") return renderPlantsAdmin();
+  if(staff()) return renderPlantsAdmin();
   const scoped = session.plantId!=null;
   const _t=scoped?'Mi planta':'Mis plantas';
   const _s=scoped?'Como jefe de mantenimiento ves únicamente el estado de tu planta.':'Dirección: ves todas las plantas de tu empresa.';
@@ -531,7 +541,7 @@ function renderPlant(){
   techsPresent.sort((a,b)=>{const ia=_tOrd.indexOf(a),ib=_tOrd.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
   const tabs=isTermo?["Global"].concat(techsPresent):TECHS;
   let out=`<main>
-    <div class="crumbs"><span onclick="go({name:'plants'})">${session.role==='admin'?'Plantas':'Mis plantas'}</span> › <b>${p.name}</b></div>
+    <div class="crumbs"><span onclick="go({name:'plants'})">${staff()?'Plantas':'Mis plantas'}</span> › <b>${p.name}</b></div>
     <div class="hero" style="background-image:linear-gradient(90deg,rgba(9,29,46,.9),rgba(9,29,46,.25)),url('${p.hero||'assets2/plant-elis.jpg'}')">
       <div class="hero-in"><div class="hero-sub">${c.name} · Inspección ${meta.medicion}</div><h1>${p.name}</h1></div>
     </div>`;
@@ -648,7 +658,7 @@ function renderMachineTermo(c,p,m){
     </div>`
     : `<div class="card pad" style="margin-top:14px;background:#f8fafc"><b style="font-size:14px">Imágenes</b><p style="color:var(--muted);font-size:12.5px;margin:6px 0 0">Las imágenes térmica y real de este cuadro están en el informe PDF. En la plataforma final se cargarán aquí, como en Zabaldea.</p></div>`;
   return `<main>
-    <div class="crumbs"><span onclick="go({name:'plants'})">${session.role==='admin'?'Plantas':'Mis plantas'}</span> › <span onclick="go({name:'plant',cid:'${view.cid}',pid:'${view.pid}'})">${p.name}</span> › <b>${m.area} · ${m.name}</b></div>
+    <div class="crumbs"><span onclick="go({name:'plants'})">${staff()?'Plantas':'Mis plantas'}</span> › <span onclick="go({name:'plant',cid:'${view.cid}',pid:'${view.pid}'})">${p.name}</span> › <b>${m.area} · ${m.name}</b></div>
     <div class="m-head"><div><h1>${m.name}</h1><p class="sub">${p.name} · Área: ${m.area} · Termografía</p></div></div>
     <div class="m-states">
       <div class="state-box"><small>Estado</small>${pill(m.state)}</div>
@@ -847,7 +857,7 @@ function statsBlockEl(title,sub,B,cid,pid){
     <div class="two-col"><div class="card pad"><b style="font-size:14px">En la última inspección</b>${ult}</div><div class="card pad"><b style="font-size:14px">Acumuladas (año)</b>${year}</div></div>`;
 }
 function generarInforme(){
-  const c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));
+  const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
   if(!c){ toast('No hay datos para el informe.'); return; }
   const PL=scopedPlants(c);
   const hoy=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
@@ -931,7 +941,7 @@ function dashBlockEl(title,sub,B,ms,cid,pid){
     <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Análisis detallado por ${title.indexOf('Vibraciones')>=0?'máquina':'cuadro'}</b><p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Pulsa para abrir su <b>análisis detallado</b>.</p>${matrix}</div>`;
 }
 function renderOtuaView(mode){
-  const c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));
+  const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
   const PL=scopedPlants(c);
   let plants=PL;
   if(mode==='stats'){
@@ -950,7 +960,7 @@ function renderOtuaView(mode){
 }
 
 function renderStatsTermo(){
-  const c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));
+  const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
   const PL=scopedPlants(c); const allM=[]; PL.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{if(m.tmax!==undefined)allM.push(Object.assign({plant:p.name,pid:p.id,area:a.name},m));})));
   const n=s=>allM.filter(m=>m.state===s).length;
   const tot=allM.length, bueno=n('bueno'), seg=n('seg'), alerta=n('alerta'), peligro=n('peligro');
@@ -1012,7 +1022,7 @@ function renderStatsTermo(){
   return out;
 }
 function renderDashTermo(){
-  const c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));
+  const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
   const PL=scopedPlants(c); const allM=[]; PL.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{if(m.tmax!==undefined)allM.push(Object.assign({plant:p.name,pid:p.id,area:a.name},m));})));
   const cnt=st=>allM.filter(m=>m.state===st).length;
   const tot=allM.length,bueno=cnt('bueno'),seg=cnt('seg'),alerta=cnt('alerta'),peligro=cnt('peligro');
@@ -1066,7 +1076,7 @@ function renderDashTermo(){
 function renderMachineVib(c,p,m){
   const anomalia=m.grade>2;
   return `<main>
-    <div class="crumbs"><span onclick="go({name:'plants'})">${session.role==='admin'?'Plantas':'Mis plantas'}</span> › <span onclick="go({name:'plant',cid:'${view.cid}',pid:'${view.pid}'})">${p.name}</span> › <b>${m.name}</b></div>
+    <div class="crumbs"><span onclick="go({name:'plants'})">${staff()?'Plantas':'Mis plantas'}</span> › <span onclick="go({name:'plant',cid:'${view.cid}',pid:'${view.pid}'})">${p.name}</span> › <b>${m.name}</b></div>
     <div class="m-head"><div><h1>${m.name}</h1><p class="sub">${p.name} · Vibraciones</p></div></div>
     <div class="m-states">
       <div class="state-box"><small>Estado</small>${pill(m.state)}</div>
@@ -1152,7 +1162,7 @@ function renderMachine(){
   if(m&&m.vib) m=adaptVibElis(m,p);
   const act=f=>f.rec && f.rec.toUpperCase().indexOf('NO REQUIERE')<0;
   let out=`<main>
-    <div class="crumbs"><span onclick="go({name:'plants'})">${session.role==='admin'?'Plantas':'Mis plantas'}</span> › <span onclick="go({name:'plant',cid:'${view.cid}',pid:'${view.pid}'})">${p.name}</span> › <b>${m.area} · ${m.name}</b></div>
+    <div class="crumbs"><span onclick="go({name:'plants'})">${staff()?'Plantas':'Mis plantas'}</span> › <span onclick="go({name:'plant',cid:'${view.cid}',pid:'${view.pid}'})">${p.name}</span> › <b>${m.area} · ${m.name}</b></div>
     <div class="m-head">
       <div><h1>${m.name}</h1><p class="sub">${p.name} · Área: ${m.area}</p></div>
       ${session.role==='admin'?`<button class="btn" onclick="editState('${m.id}','${m.name.replace(/'/g,"")}','${m.state}')">✎ Editar estado</button>`:''}
@@ -1235,7 +1245,7 @@ function renderUpload(){
     </div>
     <div class="card pad" style="margin-top:14px;border-left:4px solid var(--steel)">
       <b style="font-size:14px">2.5 · Revisión antes de publicar — la hago yo (Claude)</b>
-      <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de que el informe llegue al cliente lo <b>reviso</b>: corrijo lo que puedo (ortografía, frases cortadas, formato) y marco lo que necesita tu criterio (coherencia grado/comentario, datos que falten). Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, <b>siempre con copia a ${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
+      <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de que el informe llegue al cliente lo <b>reviso</b>: corrijo lo que puedo (ortografía, frases cortadas, formato) y marco lo que necesita tu criterio (coherencia grado/comentario, datos que falten). Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, a <b>los técnicos y a Pedro</b>, con copia a <b>${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
       <button class="btn" onclick="openReviewAviso()">Ver aviso de revisión →</button>
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--steel-soft);border-color:#cfe3f3">
@@ -1301,7 +1311,7 @@ function renderUsers(){
 function renderStats(){
   const S=STATS2;
   // mejoras computed dynamically (same rule as every client): acumulado = bajadas en las 4 últimas medidas (pico→actual)
-  const _c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));
+  const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
   const _EMS=[]; (_c?scopedPlants(_c):[]).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>_EMS.push({name:a.name+' · '+m.name,trend:m.trend,evo:m.evo}))));
   const MJ=calcMej(_EMS);
   let parosEvit=0; _EMS.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});
@@ -1479,7 +1489,7 @@ const REVIEW_DEMO={
 function openReviewAviso(){ showReviewAviso(REVIEW_DEMO); }
 function showReviewAviso(R){
   const nCorr=R.corregido.length, nRev=R.revisar.length, ok=nRev===0;
-  const tecMail=(R.tecnico&&R.tecnico.e)||'(técnico que sube el informe)';
+  const tecMail=AVISO_TECNICOS.join(', ');
   const asunto=ok?`Revisión VIBKAPTUR · ${R.planta} (${R.tecnica}) · ✔ listo para publicar`
                  :`Revisión VIBKAPTUR · ${R.planta} (${R.tecnica}) · ${nRev} punto(s) a revisar`;
   const corrHtml=R.corregido.map(c=>`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #eef2f6;font-size:12.5px"><span style="color:#1f9d55;font-weight:800">✔</span><div><b>${c.t}:</b> ${c.d}</div></div>`).join('')||'<div style="color:#64748b;font-size:12.5px;padding:4px 0">Sin correcciones necesarias.</div>';
@@ -1642,8 +1652,8 @@ function render(){
       case "upload":body=renderUpload();break;
       case "users":body=renderUsers();break;
       case "tecnicas":body=renderTecnicas();break;
-      case "dash":{const _c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));body=(_c&&_c.plants&&_c.plants.some(p=>p.areas.some(a=>a.machines.some(m=>m.vib||m.tmax!==undefined))) && _c.id!=='elis')?renderOtuaView('dash'):renderDash();break;}
-      case "stats":{const _c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));body=(_c&&_c.id!=='elis'&&_c.plants&&_c.plants.some(p=>p.areas.some(a=>a.machines.some(m=>m.vib||m.tmax!==undefined))))?renderOtuaView('stats'):renderStats();break;}
+      case "dash":{const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));body=(_c&&_c.plants&&_c.plants.some(p=>p.areas.some(a=>a.machines.some(m=>m.vib||m.tmax!==undefined))) && _c.id!=='elis')?renderOtuaView('dash'):renderDash();break;}
+      case "stats":{const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));body=(_c&&_c.id!=='elis'&&_c.plants&&_c.plants.some(p=>p.areas.some(a=>a.machines.some(m=>m.vib||m.tmax!==undefined))))?renderOtuaView('stats'):renderStats();break;}
       default:body=renderPlants();
     }
   }catch(e){
