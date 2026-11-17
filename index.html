@@ -1744,8 +1744,8 @@ function techReports(c,tech){
   return r;
 }
 function renderTecnicas(){
-  const _cli=DATA.clients.find(x=>x.id===session.clientId);
-  const isAdmin=session.role==='admin';
+  const _cli=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
+  const isAdmin=staff();
   const techs = isAdmin ? TECH_ICONS.map(t=>t[1]) : clientTechs(_cli);
   const ICONS = techs.map(name=>[TECH_ICON_OF[name]||'end', name]);
   const cards=ICONS.map(t=>{
