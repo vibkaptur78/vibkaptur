@@ -514,19 +514,19 @@ function renderHeader(){
   const nav=isTec
     ? `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Plantas</a>
        <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
-       <a onclick="go({name:'dash'})" class="${view.name==='dash'?'active':''}">Análisis</a>
-       <a onclick="go({name:'stats'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>
+       <a onclick="go({name:'dash',cid:'${view.cid||''}',pid:'${view.pid||''}'})" class="${view.name==='dash'?'active':''}">Análisis</a>
+       <a onclick="go({name:'stats',cid:'${view.cid||''}',pid:'${view.pid||''}'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>
        <a onclick="go({name:'upload'})" class="${view.name==='upload'?'active':''}">Subir informe</a>`
     : isAdmin
     ? `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Plantas</a>
        <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
-       <a onclick="go({name:'dash'})" class="${view.name==='dash'?'active':''}">Análisis</a>
+       <a onclick="go({name:'dash',cid:'${view.cid||''}',pid:'${view.pid||''}'})" class="${view.name==='dash'?'active':''}">Análisis</a>
        <a onclick="go({name:'upload'})" class="${view.name==='upload'?'active':''}">Subir informe</a>
        <a onclick="go({name:'users'})" class="${view.name==='users'?'active':''}">Clientes y accesos</a>`
     : `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Mis plantas</a>
        <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
-       <a onclick="go({name:'dash'})" class="${view.name==='dash'?'active':''}">Análisis</a>
-       <a onclick="go({name:'stats'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>`;
+       <a onclick="go({name:'dash',cid:'${view.cid||''}',pid:'${view.pid||''}'})" class="${view.name==='dash'?'active':''}">Análisis</a>
+       <a onclick="go({name:'stats',cid:'${view.cid||''}',pid:'${view.pid||''}'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>`;
   return `<header>
     <div class="logo"><img src="assets2/logo-white.png" alt="Ingenor" style="height:22px"><span class="sep"></span><span class="wm">VIBKAPTUR</span><small style="color:#9db6cc">MANTENIMIENTO PREDICTIVO</small></div>
     <nav>${nav}</nav>
@@ -1020,12 +1020,15 @@ function dashBlockEl(title,sub,B,ms,cid,pid){
 function renderOtuaView(mode){
   const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
   const PL=scopedPlants(c);
-  let plants=PL;
-  if(mode==='stats'){
+  let plants = (view.pid? PL.filter(p=>p.id===view.pid) : PL);
+  if(!plants.length) plants=PL;
+  if(mode==='stats' && plants.length>1){
     const scoreOf=p=>{let ms=[];p.areas.forEach(a=>a.machines.forEach(m=>ms.push(m)));return calcMej(ms).year.length;};
-    plants=[...PL].sort((a,b)=>scoreOf(b)-scoreOf(a));
+    plants=[...plants].sort((a,b)=>scoreOf(b)-scoreOf(a));
   }
-  let out=`<main><h1>${mode==='stats'?'Estadísticas':'Análisis'} — ${c.name}</h1><p class="sub">${mode==='stats'?'Plantas ordenadas por las que más han mejorado (más máquinas con severidad reducida). ':''}En las plantas con varias técnicas, primero vibraciones y luego termografía.</p>`;
+  const soloPlanta = plants.length===1;
+  const _titulo = soloPlanta ? plants[0].name : c.name;
+  let out=`<main><h1>${mode==='stats'?'Estadísticas':'Análisis'} — ${_titulo}</h1><p class="sub">${(mode==='stats'&&!soloPlanta)?'Plantas ordenadas por las que más han mejorado (más máquinas con severidad reducida). ':''}En las plantas con varias técnicas, primero vibraciones y luego termografía.</p>`;
   if(mode==='stats') out+=`<div class="noprint" style="margin:2px 0 16px"><button class="btn" onclick="generarInforme()" style="background:var(--green)">📄 Generar informe de resultados (PDF)</button> <span style="color:var(--muted);font-size:12px;margin-left:6px">Resumen descargable de las mejoras conseguidas con el mantenimiento predictivo.</span></div>`;
   plants.forEach(p=>{
     out+=`<div style="margin:18px 0 6px;padding:8px 14px;background:var(--navy);color:#fff;border-radius:10px;font-weight:700">${p.name}</div>`;
