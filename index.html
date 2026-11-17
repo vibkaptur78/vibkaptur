@@ -998,13 +998,13 @@ function renderStatsTermo(){
   const SVO=savingsOtua(PL);
   out+=`<div class="card pad" style="border-left:4px solid #2f6f52;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:15px">Ahorro económico estimado</b><span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span></div>
-    <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Valor aproximado de las averías e incidencias eléctricas evitadas o detectadas a tiempo, según su severidad y el coste típico de parada en el sector metal/reciclaje.</p>
+    <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Ahorro realizado: solo cuenta cuando un equipo <b>ha bajado</b> de grado (vibraciones) o de temperatura (termografía) tras detectar el problema, una vez por bajada.</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap">
       <div style="background:#e8f3ec;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:#2f6f52;line-height:1">${eur(SVO.cur)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">esta campaña</div></div>
       <div style="background:#eef4fb;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:var(--navy);line-height:1">${eur(SVO.yr)}</div><div style="font-size:11px;color:#334;margin-top:3px">acumulado 2026</div></div>
     </div>
     ${SVO.perPlant.length>1?`<table style="margin-top:10px;font-size:12.5px"><thead><tr><th>Planta</th><th style="text-align:right">Esta campaña</th><th style="text-align:right">Acumulado 2026</th></tr></thead><tbody>${SVO.perPlant.map(x=>`<tr><td><b>${x.name}</b></td><td style="text-align:right">${eur(x.cur)}</td><td style="text-align:right">${eur(x.yr)}</td></tr>`).join('')}</tbody></table>`:''}
-    <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: por cada equipo en grado ≥4 (vibraciones) o cuadro con calentamiento ≥70 °C (termografía) se estima la probabilidad de llegar a fallo × el sobrecoste de una parada no planificada por clase de equipo (banda metal/reciclaje). El acumulado recorre el histórico de 2026 de cada equipo. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
+    <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: cada bajada de grado/temperatura cuenta el fallo que se evitó = probabilidad de fallo del nivel del que baja × sobrecoste de una parada no planificada por clase de equipo (banda metal/reciclaje). No se suma cada inspección en que aparece el problema, solo las bajadas; el acumulado recorre el histórico de 2026. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
   </div>`;
   // per-plant table
   out+=`<div class="card" style="margin-bottom:16px"><div class="pad"><b style="font-size:14px">Resumen por planta</b></div>
@@ -1394,16 +1394,12 @@ function renderStats(){
         <b style="font-size:15px">Ahorro económico estimado</b>
         <span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span>
       </div>
-      <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Valor aproximado de las averías evitadas o detectadas a tiempo en esta campaña, según la severidad de cada equipo y el coste típico de una parada no planificada.</p>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-        <div style="background:#e8f3ec;border-radius:12px;padding:12px 20px"><div style="font-size:27px;font-weight:800;color:var(--g-bueno);line-height:1">${eur(SV.total)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">evitado · esta campaña</div></div>
-        <div style="font-size:12.5px;color:#334;line-height:1.9">
-          <div>Grado 7–6 <span style="color:var(--muted)">(inminente)</span>: <b>${eur(SV.byg[6])}</b></div>
-          <div>Grado 5 <span style="color:var(--muted)">(atención)</span>: <b>${eur(SV.byg[5])}</b></div>
-          <div>Grado 4 <span style="color:var(--muted)">(seguimiento)</span>: <b>${eur(SV.byg[4])}</b></div>
-        </div>
+      <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Ahorro realizado: solo cuenta cuando un equipo <b>ha bajado de grado</b> (problema detectado y corregido), una vez por bajada.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="background:#e8f3ec;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:var(--g-bueno);line-height:1">${eur(SV.cur)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">esta campaña</div></div>
+        <div style="background:#eef4fb;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:var(--navy);line-height:1">${eur(SV.yr)}</div><div style="font-size:11px;color:#334;margin-top:3px">acumulado 2026</div></div>
       </div>
-      <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: por cada equipo en grado ≥4 se estima la probabilidad de que llegue a fallo si no se actúa (20% / 50% / 80%) × el sobrecoste de una parada no planificada frente a la intervención planificada, por clase de equipo. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales). El acumulado se suma en cada visita.</p>
+      <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: cada vez que un equipo baja de grado se cuenta el fallo que se evitó = probabilidad de fallo del grado del que baja × sobrecoste de una parada no planificada frente a la planificada, por clase de equipo. No se suma cada inspección en que aparece el problema, solo las bajadas. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
     </div>
     <div class="two-col">
       <div class="card pad"><b style="font-size:14px">Evolución del estado</b>
@@ -1444,14 +1440,19 @@ function savP(g){return g>=6?0.80:(g===5?0.50:(g===4?0.20:0));}
 function savHistG(m){var h=m.trend||m.evo||[],r=[];h.forEach(function(x){if(x.g!=null)r.push(x.g);});return r;}
 function savImproved(m){var g=savHistG(m);return g.length>=2&&g[g.length-1]<g[g.length-2];}
 function savTempImproved(m){var h=m.evo||[],r=[];h.forEach(function(x){if(x.t!=null)r.push(x.t);});return r.length>=2&&r[r.length-1]<r[r.length-2];}
+function savY(x){return (x||'').indexOf('26')>=0;}
 function savingsModel(c){
-  let total=0,n=0,byg={4:0,5:0,6:0};
+  // Solo se cuenta el ahorro cuando un equipo HA BAJADO de grado (problema corregido), una vez por bajada.
+  let cur=0,yr=0;
   if(c) scopedPlants(c).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{
-    const g=m.grade||0; if(g<4)return;
-    if(g===4 && savImproved(m)) return; // seguimiento que ya está mejorando: no cuenta como avería evitada
-    const ah=savP(g)*(SAV_DELTA[savClass(m.name)]||5000);
-    total+=ah; n++; byg[g>=6?6:g]=(byg[g>=6?6:g]||0)+ah;})));
-  return {total:total,n:n,byg:byg};
+    const tr=m.trend||[]; const d=SAV_DELTA[savClass(m.name)]||5000;
+    for(let i=1;i<tr.length;i++){
+      const gf=tr[i-1].g, gt=tr[i].g;
+      if(gf==null||gt==null) continue;
+      if(gt<gf && gf>=4 && savY(tr[i].l)){ const v=savP(gf)*d; yr+=v; if(i===tr.length-1) cur+=v; }
+    }
+  })));
+  return {cur:cur,yr:yr};
 }
 /* ===== Modelo de ahorro OTUA (metal/reciclaje: vibraciones + termografía, con acumulado del año) ===== */
 const SAVO_T=10000;
@@ -1470,18 +1471,17 @@ function savingsOtua(PL){
   (PL||[]).forEach(p=>{let pc=0,py=0;
     p.areas.forEach(a=>a.machines.forEach(m=>{
       const isvib=(m.tmax===undefined||m.tmax===null||m.tmax==='')&&(m.grade!=null);
-      if(isvib){const g=m.grade||0,d=savoDvib(m.name),ev=m.evo||[];
-        // actual: seguimiento (g4) que ya está mejorando no cuenta
-        if(g>=5 || (g===4 && !savImproved(m))) pc+=savoPvib(g)*d;
-        // acumulado 2026: por campaña, saltando el g4 que baja respecto a la anterior
-        ev.forEach((e,idx)=>{if(!savo2026(e.q))return;const gg=e.g||0;if(gg<4)return;
-          if(gg===4 && idx>0 && (ev[idx-1].g||0)>gg) return;
-          py+=savoPvib(gg)*d;});
-      }else{const d=SAVO_T,ev=m.evo||[];
-        if(savoPtemp(m.tmax)>0 && !(m.state==='seg' && savTempImproved(m))) pc+=savoPtemp(m.tmax)*d;
-        ev.forEach((e,idx)=>{if(!savo2026(e.q))return;if(savoPtemp(e.t)<=0)return;
-          if(idx>0 && (ev[idx-1].t||0)>(e.t||0)) return;
-          py+=savoPtemp(e.t)*d;});
+      const ev=m.evo||[];
+      if(isvib){const d=savoDvib(m.name);
+        // Solo bajadas: cada vez que el grado baja respecto a la medición anterior, una vez.
+        for(let i=1;i<ev.length;i++){const gf=ev[i-1].g,gt=ev[i].g;
+          if(gf==null||gt==null)continue;
+          if(gt<gf && gf>=4 && savo2026(ev[i].q)){const v=savoPvib(gf)*d;py+=v;if(i===ev.length-1)pc+=v;}}
+      }else{const d=SAVO_T;
+        // Solo bajadas de temperatura desde un calentamiento relevante (>=70 °C).
+        for(let i=1;i<ev.length;i++){const tf=ev[i-1].t,tt=ev[i].t;
+          if(tf==null||tt==null)continue;
+          if(tt<tf && savoPtemp(tf)>0 && savo2026(ev[i].q)){const v=savoPtemp(tf)*d;py+=v;if(i===ev.length-1)pc+=v;}}
       }
     }));
     perPlant.push({name:p.name.replace('Planta ',''),cur:pc,yr:py});cur+=pc;yr+=py;
