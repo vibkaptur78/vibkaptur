@@ -994,6 +994,18 @@ function renderStatsTermo(){
       <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#e08a00">${seg+alerta+peligro}</div><small style="color:var(--muted)">Con calentamiento</small></div>
       <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#d23b3b">${hot?parseFloat(hot.tmax).toFixed(0)+'°':'—'}</div><small style="color:var(--muted)">Tª máx (${hot?hot.plant.replace('Planta ',''):''})</small></div>
     </div>`;
+  // Ahorro económico estimado (metal + termografía, con acumulado del año)
+  const SVO=savingsOtua(PL);
+  out+=`<div class="card pad" style="border-left:4px solid #2f6f52;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:15px">Ahorro económico estimado</b><span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span></div>
+    <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Valor aproximado de las averías e incidencias eléctricas evitadas o detectadas a tiempo, según su severidad y el coste típico de parada en el sector metal/reciclaje.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div style="background:#e8f3ec;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:#2f6f52;line-height:1">${eur(SVO.cur)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">esta campaña</div></div>
+      <div style="background:#eef4fb;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:var(--navy);line-height:1">${eur(SVO.yr)}</div><div style="font-size:11px;color:#334;margin-top:3px">acumulado 2026</div></div>
+    </div>
+    ${SVO.perPlant.length>1?`<table style="margin-top:10px;font-size:12.5px"><thead><tr><th>Planta</th><th style="text-align:right">Esta campaña</th><th style="text-align:right">Acumulado 2026</th></tr></thead><tbody>${SVO.perPlant.map(x=>`<tr><td><b>${x.name}</b></td><td style="text-align:right">${eur(x.cur)}</td><td style="text-align:right">${eur(x.yr)}</td></tr>`).join('')}</tbody></table>`:''}
+    <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: por cada equipo en grado ≥4 (vibraciones) o cuadro con calentamiento ≥70 °C (termografía) se estima la probabilidad de llegar a fallo × el sobrecoste de una parada no planificada por clase de equipo (banda metal/reciclaje). El acumulado recorre el histórico de 2026 de cada equipo. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
+  </div>`;
   // per-plant table
   out+=`<div class="card" style="margin-bottom:16px"><div class="pad"><b style="font-size:14px">Resumen por planta</b></div>
     <table><thead><tr><th>Planta</th><th>Cuadros</th><th>Bueno</th><th>Segui.</th><th>Alerta</th><th>Tª máx</th></tr></thead><tbody>`;
@@ -1436,6 +1448,35 @@ function savingsModel(c){
     const ah=savP(g)*(SAV_DELTA[savClass(m.name)]||5000);
     total+=ah; n++; byg[g>=6?6:g]=(byg[g>=6?6:g]||0)+ah;})));
   return {total:total,n:n,byg:byg};
+}
+/* ===== Modelo de ahorro OTUA (metal/reciclaje: vibraciones + termografía, con acumulado del año) ===== */
+const SAVO_T=10000;
+function savoDvib(n){n=(n||'').toLowerCase();
+  if(n.indexOf('molino')>=0)return 20000;
+  if(n.indexOf('horno')>=0||n.indexOf('acciona')>=0)return 18000;
+  if(n.indexOf('fragmentadora')>=0)return 15000;
+  if(n.indexOf('motoreductor')>=0||n.indexOf('reductora')>=0)return 16000;
+  if(n.indexOf('bomba')>=0)return 9000;
+  return 8000;}
+function savoPvib(g){return g>=6?0.80:(g===5?0.50:(g===4?0.20:0));}
+function savoPtemp(t){t=parseFloat(t);return isNaN(t)?0:(t>=85?0.60:(t>=70?0.40:0));}
+function savo2026(q){return (q||'').indexOf('26')>=0;}
+function savingsOtua(PL){
+  let cur=0,yr=0;const perPlant=[];
+  (PL||[]).forEach(p=>{let pc=0,py=0;
+    p.areas.forEach(a=>a.machines.forEach(m=>{
+      const isvib=(m.tmax===undefined||m.tmax===null||m.tmax==='')&&(m.grade!=null);
+      if(isvib){const g=m.grade||0,d=savoDvib(m.name);
+        if(g>=4)pc+=savoPvib(g)*d;
+        (m.evo||[]).forEach(e=>{if(savo2026(e.q)&&(e.g||0)>=4)py+=savoPvib(e.g)*d;});
+      }else{const d=SAVO_T;
+        if(savoPtemp(m.tmax)>0)pc+=savoPtemp(m.tmax)*d;
+        (m.evo||[]).forEach(e=>{if(savo2026(e.q)&&savoPtemp(e.t)>0)py+=savoPtemp(e.t)*d;});
+      }
+    }));
+    perPlant.push({name:p.name.replace('Planta ',''),cur:pc,yr:py});cur+=pc;yr+=py;
+  });
+  return {cur:cur,yr:yr,perPlant:perPlant};
 }
 function statBar(label,n){
   const tot=n.bueno+n.seg+n.alerta+n.peligro||1;const h=v=>Math.round(v/tot*130);
