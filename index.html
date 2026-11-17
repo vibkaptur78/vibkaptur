@@ -298,16 +298,27 @@ function saveContacts(){ try{localStorage.setItem('ingenor_contacts',JSON.string
 let DLSTATS=(function(){ try{const v=localStorage.getItem('ingenor_dl'); if(v) return JSON.parse(v);}catch(e){} return {}; })();
 function saveDL(){ try{localStorage.setItem('ingenor_dl',JSON.stringify(DLSTATS));}catch(e){} }
 function recordDownload(cid,who){ if(!cid)return; DLSTATS[cid]=DLSTATS[cid]||{count:0,people:{}}; DLSTATS[cid].count++; DLSTATS[cid].people[who]=(DLSTATS[cid].people[who]||0)+1; DLSTATS[cid].last=new Date().toLocaleString('es-ES'); saveDL(); }
-/* Informe completo: lo sirve la plataforma tras el login (carpeta protegida en el servidor). */
-const REPORTS_BASE='informes/';
-const REPORT_FILE={ elis:'ELIS_INFORME_NOVIEMBRE_2026.pdf' };
-function reportUrl(){ var cid=(session&&session.clientId)||(staff()?(view.cid||DATA.clients[0].id):null); var f=REPORT_FILE[cid]; return f?(REPORTS_BASE+f):null; }
+/* Informe completo: lo sirve la plataforma tras el login, desde una carpeta protegida,
+   con un token firmado por el servidor (caduca a las 12h). Técnicos: sin token. */
+function fetchDlToken(email,password,remember){
+  try{
+    fetch('/api/token.php',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:email,password:password})})
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j&&j.ok&&session){ session.dlToken=j.token; try{ if(remember!==false) localStorage.setItem('vibk_session',JSON.stringify(session)); }catch(e){} } })
+      .catch(function(){});
+  }catch(e){}
+}
 function doDownload(){
   if(session&&session.canDownload===false){ toast('La descarga del informe es exclusiva del cliente y de administración.'); return; }
-  if(session&&session.role==='client'){ recordDownload(session.clientId, session.name+(session.plantName?(' · '+session.plantName.replace('Planta ','')):(' · '+(session.puesto||'')))); }
-  var url=reportUrl();
-  if(url){ var a=document.createElement('a'); a.href=url; a.download=''; a.rel='noopener'; document.body.appendChild(a); a.click(); a.remove(); if(session&&session.role==='client') toast('Descargando informe. Tu descarga queda registrada para Ingenor.'); }
-  else { toast('El informe de este cliente se publicará aquí en cuanto esté disponible.'); }
+  var c=(session&&session.role==='client')?session.clientId:((view&&view.cid)||(session&&session.clientId)||'elis');
+  if(session&&session.dlToken){
+    if(session.role==='client') recordDownload(session.clientId, session.name+(session.plantName?(' · '+session.plantName.replace('Planta ','')):(' · '+(session.puesto||''))));
+    var url='/api/informe.php?c='+encodeURIComponent(c)+'&t='+encodeURIComponent(session.dlToken);
+    var a=document.createElement('a'); a.href=url; a.rel='noopener'; a.target='_blank'; document.body.appendChild(a); a.click(); a.remove();
+    if(session.role==='client') toast('Descargando informe. Tu descarga queda registrada para Ingenor.');
+  } else {
+    toast('Preparando la descarga… espera un segundo y vuelve a pulsar.');
+  }
 }
 function clientName(cid){const c=DATA.clients.find(x=>x.id===cid);return c?c.name:cid;}
 function setUploadCid(v){uploadCid=v;render();}
@@ -442,6 +453,7 @@ function doLogin(){
   const rem=document.getElementById('loginRemember'); const remember=rem?rem.checked:true;
   try{ if(window.PasswordCredential){ navigator.credentials.store(new PasswordCredential({id:em,password:pw,name:u.name})); } }catch(e){}
   startSession(u, remember);
+  if(u.canDownload!==false){ fetchDlToken(em, pw, remember); }
 }
 function scopedPlants(c){ if(!c||!c.plants) return []; return (session && session.plantId)? c.plants.filter(p=>p.id===session.plantId) : c.plants; }
 function logout(){ try{localStorage.removeItem('vibk_session');}catch(e){} session=null; go({name:"plants"}); }
