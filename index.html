@@ -1441,10 +1441,14 @@ function savClass(n){n=(n||'').toLowerCase();
   if(n.trim()==='motor')return'motor';
   return'turbina';}
 function savP(g){return g>=6?0.80:(g===5?0.50:(g===4?0.20:0));}
+function savHistG(m){var h=m.trend||m.evo||[],r=[];h.forEach(function(x){if(x.g!=null)r.push(x.g);});return r;}
+function savImproved(m){var g=savHistG(m);return g.length>=2&&g[g.length-1]<g[g.length-2];}
+function savTempImproved(m){var h=m.evo||[],r=[];h.forEach(function(x){if(x.t!=null)r.push(x.t);});return r.length>=2&&r[r.length-1]<r[r.length-2];}
 function savingsModel(c){
   let total=0,n=0,byg={4:0,5:0,6:0};
   if(c) scopedPlants(c).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{
     const g=m.grade||0; if(g<4)return;
+    if(g===4 && savImproved(m)) return; // seguimiento que ya está mejorando: no cuenta como avería evitada
     const ah=savP(g)*(SAV_DELTA[savClass(m.name)]||5000);
     total+=ah; n++; byg[g>=6?6:g]=(byg[g>=6?6:g]||0)+ah;})));
   return {total:total,n:n,byg:byg};
@@ -1466,12 +1470,18 @@ function savingsOtua(PL){
   (PL||[]).forEach(p=>{let pc=0,py=0;
     p.areas.forEach(a=>a.machines.forEach(m=>{
       const isvib=(m.tmax===undefined||m.tmax===null||m.tmax==='')&&(m.grade!=null);
-      if(isvib){const g=m.grade||0,d=savoDvib(m.name);
-        if(g>=4)pc+=savoPvib(g)*d;
-        (m.evo||[]).forEach(e=>{if(savo2026(e.q)&&(e.g||0)>=4)py+=savoPvib(e.g)*d;});
-      }else{const d=SAVO_T;
-        if(savoPtemp(m.tmax)>0)pc+=savoPtemp(m.tmax)*d;
-        (m.evo||[]).forEach(e=>{if(savo2026(e.q)&&savoPtemp(e.t)>0)py+=savoPtemp(e.t)*d;});
+      if(isvib){const g=m.grade||0,d=savoDvib(m.name),ev=m.evo||[];
+        // actual: seguimiento (g4) que ya está mejorando no cuenta
+        if(g>=5 || (g===4 && !savImproved(m))) pc+=savoPvib(g)*d;
+        // acumulado 2026: por campaña, saltando el g4 que baja respecto a la anterior
+        ev.forEach((e,idx)=>{if(!savo2026(e.q))return;const gg=e.g||0;if(gg<4)return;
+          if(gg===4 && idx>0 && (ev[idx-1].g||0)>gg) return;
+          py+=savoPvib(gg)*d;});
+      }else{const d=SAVO_T,ev=m.evo||[];
+        if(savoPtemp(m.tmax)>0 && !(m.state==='seg' && savTempImproved(m))) pc+=savoPtemp(m.tmax)*d;
+        ev.forEach((e,idx)=>{if(!savo2026(e.q))return;if(savoPtemp(e.t)<=0)return;
+          if(idx>0 && (ev[idx-1].t||0)>(e.t||0)) return;
+          py+=savoPtemp(e.t)*d;});
       }
     }));
     perPlant.push({name:p.name.replace('Planta ',''),cur:pc,yr:py});cur+=pc;yr+=py;
