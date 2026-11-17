@@ -276,6 +276,7 @@ const CONTACTS_DEFAULT={
 };
 let CONTACTS=(function(){ try{const v=localStorage.getItem('ingenor_contacts'); if(v) return JSON.parse(v);}catch(e){} return JSON.parse(JSON.stringify(CONTACTS_DEFAULT)); })();
 let uploadCid='elis';
+const AVISO_CC=['pedro.ortega@ingenorsistemas.com','administracion@ingenorsistemas.com'];
 function saveContacts(){ try{localStorage.setItem('ingenor_contacts',JSON.stringify(CONTACTS));}catch(e){} }
 let DLSTATS=(function(){ try{const v=localStorage.getItem('ingenor_dl'); if(v) return JSON.parse(v);}catch(e){} return {}; })();
 function saveDL(){ try{localStorage.setItem('ingenor_dl',JSON.stringify(DLSTATS));}catch(e){} }
@@ -1137,6 +1138,8 @@ function renderUpload(){
           <div class="uploader">📊 Arrastra aquí <b>todas las fichas .xls</b><br><span style="font-size:12px">La plataforma lee cada ficha y detecta máquina, severidad, fenómenos/temperaturas y diagnóstico</span></div></div>
         <div class="field"><label>Informe completo (PDF) — lo que el cliente descarga</label>
           <div class="uploader">📄 Arrastra aquí el <b>informe .pdf</b></div></div>
+        <div class="field"><label>Imágenes de termografía (térmica + real, por cuadro)</label>
+          <div class="uploader">🌡️ Arrastra aquí las <b>imágenes térmicas y reales</b><br><span style="font-size:12px">Solo las de los cuadros con anomalía. Cada par (térmica + foto real) se coloca solo en la ficha de su máquina.</span></div></div>
         <div style="font-size:11.5px;color:var(--muted);line-height:1.5">Vale subir la carpeta entera del mes. Las máquinas que ese mes salgan como <b>“no medido”</b> se respetan: no puntúan y mantienen su última medida.</div>
       </div>
       <div class="card pad">
@@ -1148,6 +1151,11 @@ function renderUpload(){
           <b>La plataforma hará sola:</b><br>• Crear/actualizar cada máquina con su estado y grado<br>• Guardar la medida y <b>quitar la 5ª más antigua</b> (ventana de 4)<br>• Pintar fenómenos, RMS, imágenes térmicas y diagnóstico<br>• Recalcular estadísticas, análisis y alarmas</div>
         <button class="btn" style="width:100%" onclick="toast('Informe analizado (demo): máquinas, severidades y diagnóstico actualizados automáticamente.')">Analizar y publicar</button>
       </div>
+    </div>
+    <div class="card pad" style="margin-top:14px;border-left:4px solid var(--steel)">
+      <b style="font-size:14px">2.5 · Revisión antes de publicar — la hago yo (Claude)</b>
+      <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de que el informe llegue al cliente lo <b>reviso</b>: corrijo lo que puedo (ortografía, frases cortadas, formato) y marco lo que necesita tu criterio (coherencia grado/comentario, datos que falten). Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, <b>siempre con copia a ${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
+      <button class="btn" onclick="openReviewAviso()">Ver aviso de revisión →</button>
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--steel-soft);border-color:#cfe3f3">
       <b>💡 Carga inicial del histórico</b><p style="margin:6px 0 0;color:#2c4a63">La primera vez se suben en bloque los informes antiguos (PDF y fichas) y cada máquina arranca con su histórico dentro. A partir de ahí, solo subes el informe del mes — igual que Preconcerto, pero con vuestros formatos.</p>
@@ -1371,6 +1379,65 @@ function renderDash(){
       ${matrix}</div>
   </main>`;
 }
+
+/* ============================================================= REVISIÓN ANTES DE PUBLICAR (aviso al técnico) */
+/* Hallazgos de ejemplo de una revisión (demo): muestran qué corrige Claude solo y qué deja para el técnico. */
+const REVIEW_DEMO={
+  planta:'Zabaldea', tecnica:'Termografía', periodo:'sep. 2026', tecnico:{n:'',e:''},
+  corregido:[
+    {t:'Ortografía', d:'“Componenetes” → “Componentes” (cuadro CGBT-2)'},
+    {t:'Ortografía', d:'“vibracion elevada” → “vibración elevada” (Bomba P-14)'},
+    {t:'Frase cortada', d:'La nota del Soplante S-2 terminaba a media frase (“…debido a la”); recortada a la última frase completa'},
+    {t:'Formato', d:'Comentario en MAYÚSCULAS del cuadro 1K1 pasado a texto normal'}
+  ],
+  revisar:[
+    {t:'Grado vs. comentario', d:'Motor M-7 marcado Grado 7 (peligro) pero el comentario dice “sin anomalías reseñables”.'},
+    {t:'Falta un dato', d:'Bomba P-14 con Grado 6 pero sin “actuación recomendada”.'},
+    {t:'Temperatura vs. grado', d:'Cuadro CGBT-2 con Tmáx 72 °C pero Grado 3; revisa si el grado es correcto.'}
+  ]
+};
+function openReviewAviso(){ showReviewAviso(REVIEW_DEMO); }
+function showReviewAviso(R){
+  const nCorr=R.corregido.length, nRev=R.revisar.length, ok=nRev===0;
+  const tecMail=(R.tecnico&&R.tecnico.e)||'(técnico que sube el informe)';
+  const asunto=ok?`Revisión VIBKAPTUR · ${R.planta} (${R.tecnica}) · ✔ listo para publicar`
+                 :`Revisión VIBKAPTUR · ${R.planta} (${R.tecnica}) · ${nRev} punto(s) a revisar`;
+  const corrHtml=R.corregido.map(c=>`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #eef2f6;font-size:12.5px"><span style="color:#1f9d55;font-weight:800">✔</span><div><b>${c.t}:</b> ${c.d}</div></div>`).join('')||'<div style="color:#64748b;font-size:12.5px;padding:4px 0">Sin correcciones necesarias.</div>';
+  const revHtml=R.revisar.map(w=>`<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #eef2f6;font-size:12.5px"><span style="color:#e08a00;font-weight:800">●</span><div style="flex:1"><b>${w.t}:</b> ${w.d}</div><span onclick="toast('Abriría la ficha para revisar este punto (demo).')" style="color:var(--steel);font-weight:700;cursor:pointer;white-space:nowrap">Revisar →</span></div>`).join('')||'<div style="color:#1f9d55;font-size:12.5px;padding:4px 0">Nada pendiente de tu revisión ✔</div>';
+  const html=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:580px">
+    <div class="mh">Aviso de revisión al técnico <span style="cursor:pointer" onclick="closeModal()">✕</span></div>
+    <div class="mb" style="background:#f4f7fa">
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.7">
+        <b>Para:</b> ${tecMail}<br>
+        <b>CC:</b> ${AVISO_CC.join(', ')} <span style="background:#eef2f6;color:#64748b;padding:1px 7px;border-radius:20px;font-size:10px;margin-left:4px">siempre en copia</span><br>
+        <b>Asunto:</b> ${asunto}</div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+        <div style="background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:9px"><img src="assets2/logo-white.png" style="height:20px" onerror="this.style.display='none'"><b style="font-size:13.5px">Ingenor · VIBKAPTUR — Revisión de informe</b></div>
+        <div style="padding:16px 18px">
+          <p style="margin:0 0 4px;font-size:13.5px">Hola,</p>
+          <p style="margin:0 0 11px;font-size:13px;color:#475569">He revisado el informe que has subido de <b>${R.planta}</b> (${R.tecnica}, ${R.periodo}). ${ok?'Está correcto y listo para publicar.':'He corregido lo que he podido y te dejo algunos puntos para que los mires antes de publicar.'}</p>
+          <div style="display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap">
+            <span style="background:#e8f3ec;color:#1f6b45;font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px">${nCorr} corregido(s) automáticamente</span>
+            ${nRev?`<span style="background:#fff3dc;color:#b06f00;font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px">${nRev} para que revises</span>`:'<span style="background:#e8f3ec;color:#1f6b45;font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px">Nada pendiente ✔</span>'}
+          </div>
+          <div style="font-weight:700;font-size:12px;color:#334155;margin:0 0 4px">Corregido automáticamente</div>
+          ${corrHtml}
+          <div style="font-weight:700;font-size:12px;color:#334155;margin:14px 0 4px">Para que revises</div>
+          ${revHtml}
+          <div style="text-align:center;margin:16px 0 6px"><span onclick="toast('Abriría la plataforma en el informe en revisión (demo).')" style="background:var(--steel);color:#fff;padding:11px 24px;border-radius:9px;font-weight:800;display:inline-block;font-size:13.5px;cursor:pointer">Revisar en la plataforma</span></div>
+          <p style="margin:10px 0 0;font-size:12px;color:#94a3b8;text-align:center">Cuando des el OK, el informe se publica y le llega el aviso al cliente.</p>
+          <p style="margin:12px 0 0;font-size:13px">Un saludo,<br>VIBKAPTUR · revisión automática</p>
+        </div>
+      </div>
+    </div>
+    <div class="mf" style="gap:8px">
+      <button class="btn ghost" onclick="closeModal()">Cerrar</button>
+      <button class="btn" style="flex:1;background:var(--green)" onclick="tecnicoApprove()">Dar el OK y publicar ✓</button>
+    </div>
+  </div></div>`;
+  const d=document.createElement("div");d.id="modal";d.innerHTML=html;document.body.appendChild(d);
+}
+function tecnicoApprove(){ closeModal(); toast('Informe aprobado por el técnico y publicado (demo). El aviso al cliente queda listo para enviarse.'); }
 
 /* ============================================================= EMAIL PREVIEW */
 function showEmailPreview(cid){
