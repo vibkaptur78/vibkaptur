@@ -308,6 +308,21 @@ function fetchDlToken(email,password,remember){
       .catch(function(){});
   }catch(e){}
 }
+function doUpload(cid){
+  var inp=document.getElementById('pdfFile');
+  var st=document.getElementById('upStatus');
+  function msg(t){ if(st)st.innerHTML=t; }
+  if(!inp||!inp.files||!inp.files.length){ msg('Elige primero un archivo PDF.'); return; }
+  var f=inp.files[0];
+  if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
+  if(f.size>30*1024*1024){ msg('El PDF es demasiado grande (máx. 30 MB).'); return; }
+  msg('Subiendo <b>'+f.name+'</b>…');
+  var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('pdf',f);
+  fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
+    if(j&&j.ok){ msg('✅ Subido. El informe de <b>'+clientName(cid)+'</b> ya está disponible para descargar ('+Math.round(j.bytes/1024)+' KB).'); }
+    else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que tengas permiso de subida y que sea un PDF.'); }
+  }).catch(function(){ msg('Error de conexión al subir el PDF.'); });
+}
 function doDownload(){
   if(session&&session.canDownload===false){ toast('La descarga del informe es exclusiva del cliente y de administración.'); return; }
   var c=(session&&session.role==='client')?session.clientId:((view&&view.cid)||(session&&session.clientId)||'elis');
@@ -453,7 +468,7 @@ function doLogin(){
   const rem=document.getElementById('loginRemember'); const remember=rem?rem.checked:true;
   try{ if(window.PasswordCredential){ navigator.credentials.store(new PasswordCredential({id:em,password:pw,name:u.name})); } }catch(e){}
   startSession(u, remember);
-  if(u.canDownload!==false){ fetchDlToken(em, pw, remember); }
+  if(u.canDownload!==false || u.canUpload){ fetchDlToken(em, pw, remember); }
 }
 function scopedPlants(c){ if(!c||!c.plants) return []; return (session && session.plantId)? c.plants.filter(p=>p.id===session.plantId) : c.plants; }
 function logout(){ try{localStorage.removeItem('vibk_session');}catch(e){} session=null; go({name:"plants"}); }
@@ -1269,7 +1284,10 @@ function renderUpload(){
         <div class="field" style="margin-top:12px"><label>Todas las fichas de la ruta (Excel) — arrastra varias a la vez</label>
           <div class="uploader">📊 Arrastra aquí <b>todas las fichas .xls</b><br><span style="font-size:12px">La plataforma lee cada ficha y detecta máquina, severidad, fenómenos/temperaturas y diagnóstico</span></div></div>
         <div class="field"><label>Informe completo (PDF) — lo que el cliente descarga</label>
-          <div class="uploader">📄 Arrastra aquí el <b>informe .pdf</b></div></div>
+          <input type="file" id="pdfFile" accept="application/pdf,.pdf" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
+          <button class="btn" style="width:100%" onclick="doUpload('${cid}')">⬆ Subir y publicar el PDF de ${cn}</button>
+          <div id="upStatus" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Este PDF queda guardado como el informe que descargará el cliente (sustituye al anterior).</div></div>
         <div class="field"><label>Imágenes de termografía (térmica + real, por cuadro)</label>
           <div class="uploader">🌡️ Arrastra aquí las <b>imágenes térmicas y reales</b><br><span style="font-size:12px">Solo las de los cuadros con anomalía. Cada par (térmica + foto real) se coloca solo en la ficha de su máquina.</span></div></div>
         <div style="font-size:11.5px;color:var(--muted);line-height:1.5">Vale subir la carpeta entera del mes. Las máquinas que ese mes salgan como <b>“no medido”</b> se respetan: no puntúan y mantienen su última medida.</div>
