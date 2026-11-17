@@ -84,7 +84,11 @@
   .sidebtn-l{transform:rotate(180deg)}
   .sidebtn-l:hover{transform:rotate(180deg) translateY(-1px)}
   @media(max-width:760px){.sidebtn{font-size:11px;padding:14px 8px;letter-spacing:.5px}}
-  @media(max-width:560px){.sidebtn{display:none}}
+  .sidewrap{display:flex;flex-direction:column;align-items:center;gap:7px;align-self:stretch;flex:none;z-index:2}
+  .sidewrap .sidebtn{flex:1;align-self:stretch}
+  .sidetag{background:var(--navy);color:#fff;font-size:10px;font-weight:800;letter-spacing:.6px;padding:5px 9px;border-radius:8px;text-align:center;line-height:1.25;white-space:nowrap;box-shadow:0 4px 12px rgba(13,45,70,.3)}
+  .sidetag .ar{display:block;color:#7ee0a6;font-size:15px;line-height:.7;margin-top:3px}
+  @media(max-width:560px){.sidewrap{display:none}}
   .login-band{z-index:2;width:auto;max-width:560px;background:rgba(255,255,255,.96);border-radius:10px;padding:7px 18px;text-align:center;box-shadow:0 8px 26px rgba(0,0,0,.26)}
   .login-top{margin:0 auto 12px}
   .login-foot{margin:12px auto 0}
@@ -346,7 +350,7 @@ function renderLogin(){
     <b style="color:var(--navy);font-size:13px;letter-spacing:.4px">Plataforma de diagnóstico multitécnica</b>
   </div>
   <div class="login-row">
-    <a href="https://ingenorsistemas.com" target="_blank" rel="noopener" class="sidebtn sidebtn-l" title="ingenorsistemas.com">ingenorsistemas.com</a>
+    <div class="sidewrap"><div class="sidetag">SERVICIO INGENOR<span class="ar">↓</span></div><a href="https://ingenorsistemas.com" target="_blank" rel="noopener" class="sidebtn sidebtn-l" title="ingenorsistemas.com">ingenorsistemas.com</a></div>
     <div class="tech-col">${col(left)}</div>
     <div class="login">
       <img src="assets2/logo.png" alt="Ingenor Sistemas" style="width:186px;max-width:74%">
@@ -363,7 +367,7 @@ function renderLogin(){
       </form>
     </div>
     <div class="tech-col">${col(right)}</div>
-    <a href="https://ingenorsistemas-online.com" target="_blank" rel="noopener" class="sidebtn sidebtn-r" title="ingenorsistemas-online.com">ingenorsistemas-online.com</a>
+    <div class="sidewrap"><div class="sidetag">SUMINISTROS INGENOR<span class="ar">↓</span></div><a href="https://ingenorsistemas-online.com" target="_blank" rel="noopener" class="sidebtn sidebtn-r" title="ingenorsistemas-online.com">ingenorsistemas-online.com</a></div>
   </div>
   <div class="login-foot login-band">
     <span style="color:var(--navy);font-size:11.5px;letter-spacing:.4px;font-weight:700">Política de calidad · Ingenor Sistemas</span>
