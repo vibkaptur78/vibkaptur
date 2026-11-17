@@ -81,8 +81,8 @@
   @media(max-width:900px){.login-row{gap:12px}.tech-col{grid-auto-flow:row;grid-template-rows:none;gap:11px}.tcol-item{width:72px}.ib{width:46px;height:46px}.tcol-item svg{width:23px;height:23px}.login{max-width:312px}}
   @media(max-width:640px){.login-row{gap:8px}.tcol-item{width:60px}.tcol-item span{font-size:9px;letter-spacing:.4px}.ib{width:40px;height:40px}.tcol-item svg{width:19px;height:19px}.login{max-width:232px}}
   @media(max-width:470px){.tech-col{display:none}}
-  .sidebtn{writing-mode:vertical-rl;text-orientation:mixed;text-transform:uppercase;background:var(--green);color:#fff;font-weight:800;font-size:14px;letter-spacing:1.5px;padding:20px 11px;border-radius:11px;text-decoration:none;box-shadow:0 8px 22px rgba(47,111,82,.42);align-self:stretch;display:flex;align-items:center;justify-content:center;transition:.15s;flex:none;z-index:2}
-  .sidebtn:hover{background:var(--green-d);transform:translateY(-1px)}
+  .sidebtn{writing-mode:vertical-rl;text-orientation:mixed;text-transform:uppercase;background:var(--green);color:#fff;font-weight:800;font-size:16.5px;letter-spacing:2.2px;padding:20px 12px;border-radius:11px;text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:1.5px;text-decoration-color:rgba(255,255,255,.55);box-shadow:0 8px 22px rgba(47,111,82,.42);align-self:stretch;display:flex;align-items:center;justify-content:center;transition:.15s;flex:none;z-index:2}
+  .sidebtn:hover{background:var(--green-d);transform:translateY(-1px);text-decoration-color:#fff}
   .sidebtn-l{transform:rotate(180deg)}
   .sidebtn-l:hover{transform:rotate(180deg) translateY(-1px)}
   @media(max-width:760px){.sidebtn{font-size:11px;padding:14px 8px;letter-spacing:.5px}}
@@ -90,9 +90,9 @@
   .sidewrap .sidebtn{flex:1;align-self:stretch}
   .sidetag{background:var(--navy);color:#fff;font-size:13px;font-weight:800;letter-spacing:.8px;padding:7px 13px;border-radius:9px;text-align:center;line-height:1.2;white-space:nowrap;box-shadow:0 4px 12px rgba(13,45,70,.3)}
   .sidetag .ar{display:block;color:#7ee0a6;font-size:16px;line-height:.7;margin-top:3px}
-  @media(max-width:560px){.sidewrap{display:none}}
+  @media(max-width:560px){.sidewrap{display:none}.login-top b{white-space:normal;font-size:15px;letter-spacing:1px}}
   .login-band{z-index:2;width:auto;max-width:560px;background:rgba(255,255,255,.96);border-radius:10px;padding:7px 18px;text-align:center;box-shadow:0 8px 26px rgba(0,0,0,.26)}
-  .login-top{width:100%;margin:0 0 14px;background:linear-gradient(120deg,var(--navy),#1a4d75);padding:15px 28px;border-radius:13px;box-shadow:0 10px 30px rgba(9,29,46,.38);box-sizing:border-box}
+  .login-top{width:100%;margin:0 0 14px;background:linear-gradient(120deg,var(--navy),#1a4d75);padding:14px 22px;border-radius:13px;box-shadow:0 10px 30px rgba(9,29,46,.38);box-sizing:border-box;container-type:inline-size;text-align:center}
   .login-foot{margin:12px auto 0}
   .login p{color:var(--muted);margin:0 0 22px}
   .login .pick{display:grid;gap:12px;text-align:left}
@@ -424,7 +424,7 @@ function renderLogin(){
     <div class="sidewrap"><div class="sidetag">SERVICIOS<span class="ar">↓</span></div><a href="https://ingenorsistemas.com" target="_blank" rel="noopener" class="sidebtn sidebtn-l" title="ingenorsistemas.com">ingenorsistemas.com</a></div>
     <div class="login-center">
     <div class="login-top login-band">
-      <b style="color:#fff;font-size:20px;font-weight:800;letter-spacing:3px;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,.3)">Plataforma de diagnóstico multitécnica</b>
+      <b style="color:#fff;font-weight:800;letter-spacing:2px;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,.3);white-space:nowrap;font-size:clamp(13px,2.8cqw,21px);display:inline-block">Plataforma de diagnóstico multitécnica</b>
     </div>
     <div class="login-inner">
     <div class="tech-col">${col(left)}</div>
