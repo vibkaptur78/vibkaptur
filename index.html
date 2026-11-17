@@ -1331,6 +1331,7 @@ function renderStats(){
   const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));
   const _EMS=[]; (_c?scopedPlants(_c):[]).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>_EMS.push({name:a.name+' · '+m.name,trend:m.trend,evo:m.evo}))));
   const MJ=calcMej(_EMS);
+  const SV=savingsModel(_c);
   let parosEvit=0; _EMS.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});
   let bars=STATS.map(s=>statBar(s.label,{bueno:s.bueno,seg:s.seg,alerta:s.alerta,peligro:s.peligro})).join("");
   const fmax=Math.max(...S.byfen.map(x=>x.n));
@@ -1376,6 +1377,22 @@ function renderStats(){
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">↓ ${MJ.ult.length}</b><small style="color:#cfe0ee">Han bajado en la última inspección</small></div>
       </div>
     </div>
+    <div class="card pad" style="border-left:4px solid var(--g-bueno);margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+        <b style="font-size:15px">Ahorro económico estimado</b>
+        <span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Valor aproximado de las averías evitadas o detectadas a tiempo en esta campaña, según la severidad de cada equipo y el coste típico de una parada no planificada.</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <div style="background:#e8f3ec;border-radius:12px;padding:12px 20px"><div style="font-size:27px;font-weight:800;color:var(--g-bueno);line-height:1">${eur(SV.total)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">evitado · esta campaña</div></div>
+        <div style="font-size:12.5px;color:#334;line-height:1.9">
+          <div>Grado 7–6 <span style="color:var(--muted)">(inminente)</span>: <b>${eur(SV.byg[6])}</b></div>
+          <div>Grado 5 <span style="color:var(--muted)">(atención)</span>: <b>${eur(SV.byg[5])}</b></div>
+          <div>Grado 4 <span style="color:var(--muted)">(seguimiento)</span>: <b>${eur(SV.byg[4])}</b></div>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: por cada equipo en grado ≥4 se estima la probabilidad de que llegue a fallo si no se actúa (20% / 50% / 80%) × el sobrecoste de una parada no planificada frente a la intervención planificada, por clase de equipo. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales). El acumulado se suma en cada visita.</p>
+    </div>
     <div class="two-col">
       <div class="card pad"><b style="font-size:14px">Evolución del estado</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 2px">Máquinas por estado en cada inspección trimestral.</p>
@@ -1400,6 +1417,25 @@ function renderStats(){
         ${year}</div>
     </div>
   </main>`;
+}
+/* ===== Modelo de ahorro económico estimado (estimación Ingenor, conservadora) ===== */
+const SAV_DELTA={turbina:5000,bomba:6000,motor:7000,motoreductor:12000,reductora:15000,calandra:20000};
+function savClass(n){n=(n||'').toLowerCase();
+  if(n.indexOf('calandra')>=0)return'calandra';
+  if(n.indexOf('turbina')>=0)return'turbina';
+  if(n.indexOf('motoreductor')>=0)return'motoreductor';
+  if(n.indexOf('reductora')>=0)return'reductora';
+  if(n.indexOf('bomba')>=0||n.indexOf('bba')>=0)return'bomba';
+  if(n.trim()==='motor')return'motor';
+  return'turbina';}
+function savP(g){return g>=6?0.80:(g===5?0.50:(g===4?0.20:0));}
+function savingsModel(c){
+  let total=0,n=0,byg={4:0,5:0,6:0};
+  if(c) scopedPlants(c).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{
+    const g=m.grade||0; if(g<4)return;
+    const ah=savP(g)*(SAV_DELTA[savClass(m.name)]||5000);
+    total+=ah; n++; byg[g>=6?6:g]=(byg[g>=6?6:g]||0)+ah;})));
+  return {total:total,n:n,byg:byg};
 }
 function statBar(label,n){
   const tot=n.bueno+n.seg+n.alerta+n.peligro||1;const h=v=>Math.round(v/tot*130);
