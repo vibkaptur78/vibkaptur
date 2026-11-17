@@ -641,10 +641,10 @@ function renderMachineTermo(c,p,m){
   const imgs = (m.ir||m.dig) ? `<div class="two-col" style="margin-top:14px">
       <div class="card pad"><b style="font-size:14px">Imagen térmica (infrarroja)</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">El punto más caliente aparece marcado; la escala de color indica la temperatura.</p>
-        ${m.ir?`<img src="${m.ir.indexOf('data:')===0?m.ir:'assets2/termo/'+m.ir}" alt="Termografía" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
+        ${m.ir?`<img loading="lazy" src="${m.ir.indexOf('data:')===0?m.ir:'https://raw.githubusercontent.com/vibkaptur78/vibkaptur/main/assets2/termo/'+m.ir}" alt="Termografía" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
       <div class="card pad"><b style="font-size:14px">Imagen real</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Foto del cuadro para localizar físicamente el defecto.</p>
-        ${m.dig?`<img src="${m.dig.indexOf('data:')===0?m.dig:'assets2/termo/'+m.dig}" alt="Cuadro" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
+        ${m.dig?`<img loading="lazy" src="${m.dig.indexOf('data:')===0?m.dig:'https://raw.githubusercontent.com/vibkaptur78/vibkaptur/main/assets2/termo/'+m.dig}" alt="Cuadro" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
     </div>`
     : `<div class="card pad" style="margin-top:14px;background:#f8fafc"><b style="font-size:14px">Imágenes</b><p style="color:var(--muted);font-size:12.5px;margin:6px 0 0">Las imágenes térmica y real de este cuadro están en el informe PDF. En la plataforma final se cargarán aquí, como en Zabaldea.</p></div>`;
   return `<main>
