@@ -1251,7 +1251,7 @@ function renderUpload(){
     </div>
     <div class="card pad" style="margin-top:14px;border-left:4px solid var(--steel)">
       <b style="font-size:14px">2.5 · Revisión antes de publicar — la hago yo (Claude)</b>
-      <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de que el informe llegue al cliente lo <b>reviso</b>: corrijo lo que puedo (ortografía, frases cortadas, formato) y marco lo que necesita tu criterio (coherencia grado/comentario, datos que falten). Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, a <b>los técnicos y a Pedro</b>, con copia a <b>${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
+      <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de publicar, la plataforma comprueba <b>solo dos cosas</b>: (1) <b>ortografía</b> y (2) que los <b>valores y grados</b> cargados <b>coincidan con la ficha (Excel) y el resumen del PDF</b> (errores de transcripción). <b>No valora el análisis ni el diagnóstico</b> — eso es criterio del técnico. Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, a <b>los técnicos y a Pedro</b>, con copia a <b>${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
       <button class="btn" onclick="openReviewAviso()">Ver aviso de revisión →</button>
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--steel-soft);border-color:#cfe3f3">
@@ -1487,9 +1487,8 @@ const REVIEW_DEMO={
     {t:'Ortografía', d:'“ANOMALIAS” → “ANOMALÍAS” (CGBT cuadro 1; el resto del informe ya la llevaba)'}
   ],
   revisar:[
-    {t:'Fecha de inspección', d:'La metodología (pág. 6) dice “El día 15 de mayo”, pero el informe es de 25/09/2026. Parece arrastrada de la plantilla anterior — confirma la fecha real.'},
-    {t:'Actuación vacía', d:'CONTROL cuadros 8 y 10 (grado 2, calentamiento leve) tienen defecto pero la “actuación recomendada” está en blanco. ¿Les ponemos “vigilar evolución”?'},
-    {t:'Tª vs. grado', d:'CONTROL cuadro 9 (59,4 °C) va como “sin anomalías” (grado 1) y el cuadro 8 (60,9 °C) como anomalía (grado 2). Confirma si el 9 debe quedar en grado 1.'}
+    {t:'Fecha de inspección', d:'El resumen pone “15 de mayo” y el informe es de septiembre 2026. Corregir la fecha (error de transcripción).'},
+    {t:'Valores / grados vs. ficha', d:'Comprobar que el grado y la Tmáx de cada cuadro del resumen coinciden con su ficha (Excel). No se valora el criterio del diagnóstico.'}
   ]
 };
 function openReviewAviso(){ showReviewAviso(REVIEW_DEMO); }
