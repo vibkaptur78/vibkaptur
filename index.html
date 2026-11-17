@@ -352,15 +352,15 @@ function renderLogin(){
       <img src="assets2/logo.png" alt="Ingenor Sistemas" style="width:186px;max-width:74%">
       <div style="font-weight:800;font-size:26px;letter-spacing:4px;color:var(--navy);margin-top:10px">VIBKAPTUR</div>
       <div style="color:var(--muted);font-size:11px;letter-spacing:2px;margin-top:3px">INGENOR · MANTENIMIENTO PREDICTIVO</div>
-      <div style="margin-top:18px;text-align:left">
-        <input id="loginEmail" autocomplete="username" placeholder="Correo electrónico" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid var(--line);border-radius:9px;font-size:13px;margin-bottom:9px">
+      <form onsubmit="doLogin();return false" autocomplete="on" style="margin-top:18px;text-align:left">
+        <input id="loginEmail" name="username" type="email" autocomplete="username" placeholder="Correo electrónico" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid var(--line);border-radius:9px;font-size:13px;margin-bottom:9px">
         <div style="position:relative">
-          <input id="loginPass" type="password" autocomplete="current-password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;box-sizing:border-box;padding:11px 42px 11px 13px;border:1px solid var(--line);border-radius:9px;font-size:13px">
+          <input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;box-sizing:border-box;padding:11px 42px 11px 13px;border:1px solid var(--line);border-radius:9px;font-size:13px">
           <button type="button" aria-label="Mostrar contraseña" onclick="var p=document.getElementById('loginPass');if(p.type==='password'){p.type='text';this.textContent='🙈'}else{p.type='password';this.textContent='👁'}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;font-size:16px;line-height:1;color:var(--muted)">👁</button>
         </div>
         <div id="loginErr" style="color:#d23b3b;font-size:11.5px;min-height:14px;margin:6px 2px 0"></div>
-        <button class="cta" style="width:100%;margin-top:4px" onclick="doLogin()">Entrar</button>
-      </div>
+        <button type="submit" class="cta" style="width:100%;margin-top:4px">Entrar</button>
+      </form>
     </div>
     <div class="tech-col">${col(right)}</div>
     <a href="https://ingenorsistemas-online.com" target="_blank" rel="noopener" class="sidebtn sidebtn-r" title="ingenorsistemas-online.com">ingenorsistemas-online.com</a>
@@ -731,13 +731,16 @@ function famOf(m,kind){ if(kind==='termo') return m.area||'Cuadros';
   const w=(m.name||'').replace(/\(.*?\)/g,'').trim().split(/\s+/); return (w[0]||'Máquinas').charAt(0)+ (w[0]||'').slice(1).toLowerCase(); }
 function msOfKind(plant,kind){const r=[];plant.areas.forEach(a=>a.machines.forEach(m=>{const isV=!!m.vib;if((kind==='vib')===isV)r.push(Object.assign({area:a.name},m));}));return r;}
 // Accumulated improvement = dropped over the last-4 measurement window (peak → current). Última = current < previous.
+// banda de color de severidad: verde(1-2) < amarillo(3-4) < naranja(5-6) < rojo(7-10)
+function sevBand(g){return g>=7?3:g>=5?2:g>=3?1:0;}
+function bandName(r){return ['verde','amarillo','naranja','rojo'][r]||'verde';}
 function calcMej(ms){
-  const ult=[],year=[];
+  const ult=[],year=[];let jumps=0;
   ms.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);
     if(s.length>=2){const last=s[s.length-1],prev=s[s.length-2],peak=Math.max.apply(null,s);
       if(last<prev)ult.push({m:m.name,de:prev,a:last});
-      if(last<peak)year.push({m:m.name,de:peak,a:last});}});
-  return {ult,year};
+      if(last<peak){const bf=sevBand(peak),bt=sevBand(last);const o={m:m.name,de:peak,a:last,bFrom:bf,bTo:bt,jump:bf-bt};year.push(o);if(bf>bt)jumps++;}}});
+  return {ult,year,jumps};
 }
 function qNum(q){
   const M={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,set:8,oct:9,nov:10,dic:11};
@@ -768,7 +771,7 @@ function bundle(ms,kind){
   const watch=Object.keys(groups).map(a=>{const items=groups[a].sort((x,y)=>y.grade-x.grade).map(m=>({n:m.name,g:m.grade,s:m.state,id:m.id,r:m.recomendacion&&m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0?m.recomendacion:''}));
     const state=items.reduce((w,it)=>stOrder(it.s)>stOrder(w)?it.s:w,'bueno');return {area:a,state,items};}).sort((a,b)=>stOrder(b.state)-stOrder(a.state));
   // mejoras
-  const {ult:mejUltL,year:mejYearL}=calcMej(ms);
+  const {ult:mejUltL,year:mejYearL,jumps:mejJumps}=calcMej(ms);
   let parosEvit=0; const averiasDet=ms.filter(m=>(m.grade||0)>=3).length;
   ms.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});
   // ahorro
@@ -776,7 +779,7 @@ function bundle(ms,kind){
   let total=0,risk=0,per=[],cTot={parada:0,repuestos:0,mano:0,tnp:0};
   ms.forEach(m=>{const g=m.grade||0,pico=Math.max(g,...((m.evo||[]).map(x=>x.g)));const dP=Math.max(0,pOf(pico)-pOf(g));const e=dP*CF;if(e>0){total+=e;per.push({name:m.name,pico,g,eur:e});for(const k in comp)cTot[k]+=dP*comp[k];}if(g>=5)risk+=pOf(g)*CF;});
   per.sort((x,y)=>y.eur-x.eur);
-  return {n,tot,okpct,detected,acc,bars,byfen,watch,mejUltL,mejYearL,averiasDet,parosEvit,ahorro:{total,risk,per,cTot,n:per.length}};
+  return {n,tot,okpct,detected,acc,bars,byfen,watch,mejUltL,mejYearL,mejJumps,averiasDet,parosEvit,ahorro:{total,risk,per,cTot,n:per.length}};
 }
 function techHead(title,sub){
   const isV=title.indexOf('Vibraciones')>=0, isT=title.indexOf('Termograf')>=0;
@@ -794,7 +797,8 @@ function statsBlockEl(title,sub,B,cid,pid){
   const bars=B.bars.map(s=>statBar(s.label,{bueno:s.bueno,seg:s.seg,alerta:s.alerta,peligro:s.peligro})).join("")||'<span style="color:var(--muted);font-size:12px">Sin histórico suficiente.</span>';
   const fmax=Math.max(1,...B.byfen.map(x=>x.n));
   const fen=B.byfen.map(x=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${x.c}</span><b>${x.n}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${x.n/fmax*100}%;height:12px;border-radius:6px;background:${x.col}"></div></div></div>`).join("")||'<span style="color:var(--muted);font-size:12px">—</span>';
-  const mejrow=r=>`<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="color:var(--g-bueno);font-weight:800">↓</span><div style="flex:1"><b style="font-size:13px">${r.m}</b></div><span style="font-size:12px;color:var(--muted)">grado ${r.de} → <b style="color:var(--g-bueno)">${r.a}</b></span></div>`;
+  const _bc=['#2f6f52','#b8860b','#e08a00','#d23b3b'],_bbg=['#e8f3ec','#fbf4de','#fff3dc','#fce8e8'];
+  const mejrow=r=>{const jp=((r.jump||0)>=1)?` <span style="font-size:10px;font-weight:700;color:${_bc[r.bTo]};background:${_bbg[r.bTo]};padding:1px 7px;border-radius:20px;margin-left:4px;white-space:nowrap">${bandName(r.bFrom)} → ${bandName(r.bTo)}</span>`:'';return `<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="color:var(--g-bueno);font-weight:800">↓</span><div style="flex:1"><b style="font-size:13px">${r.m}</b>${jp}</div><span style="font-size:12px;color:var(--muted)">grado ${r.de} → <b style="color:var(--g-bueno)">${r.a}</b></span></div>`;};
   const ult=B.mejUltL.map(mejrow).join("")||`<div style="color:var(--muted);padding:8px 0">Sin descensos en esta inspección</div>`;
   const year=B.mejYearL.map(mejrow).join("")||`<div style="color:var(--muted);padding:8px 0">—</div>`;
   const watch=B.watch.map(w=>{const rows=w.items.map(it=>`<div onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${it.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(it.g)};background:${gbg(it.g)};border-radius:7px;padding:3px 0">${it.g}</span><div style="flex:1"><b style="font-size:12.8px">${it.n}</b>${it.r?`<div style="color:var(--muted);font-size:11.5px">${it.r}</div>`:''}</div><span style="color:var(--steel);font-weight:700">→</span></div>`).join("");
@@ -817,7 +821,8 @@ function statsBlockEl(title,sub,B,cid,pid){
     <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">En <b style="color:#b06f00">naranja</b> atención (5–6) y <b style="color:#d23b3b">rojo</b> peligro (7–10). Pulsa una máquina para su análisis.</p>
     <div class="grid3">${watch}</div>
     <h3 style="font-size:16px;margin:20px 0 4px;color:var(--navy)">Mejoras conseguidas</h3>
-    <div class="two-col"><div class="card pad"><b style="font-size:14px">En la última inspección</b>${ult}</div><div class="card pad"><b style="font-size:14px">Acumuladas</b>${year}</div></div>`;
+    ${B.mejJumps?`<p style="font-size:12.8px;color:#1f6f47;background:#e8f3ec;border-radius:8px;padding:8px 12px;margin:2px 0 10px"><b>${B.mejJumps}</b> máquina(s) han mejorado de color de severidad en el año (p. ej. de naranja a amarillo o verde).</p>`:''}
+    <div class="two-col"><div class="card pad"><b style="font-size:14px">En la última inspección</b>${ult}</div><div class="card pad"><b style="font-size:14px">Acumuladas (año)</b>${year}</div></div>`;
 }
 function dashBlockEl(title,sub,B,ms,cid,pid){
   const tot=B.tot,n=B.n;const seg=[["#1f9d55",n.bueno],["#9acd32",n.seg],["#f0a500",n.alerta],["#dc3545",n.peligro]];
@@ -1210,7 +1215,8 @@ function renderStats(){
   let bars=STATS.map(s=>statBar(s.label,{bueno:s.bueno,seg:s.seg,alerta:s.alerta,peligro:s.peligro})).join("");
   const fmax=Math.max(...S.byfen.map(x=>x.n));
   let fen=S.byfen.map(x=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${x.c}</span><b>${x.n}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${x.n/fmax*100}%;height:12px;border-radius:6px;background:${x.col}"></div></div></div>`).join("");
-  const mejrow=r=>`<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="color:var(--g-bueno);font-weight:800">↓</span><div style="flex:1"><b style="font-size:13px">${r.m}</b></div><span style="font-size:12px;color:var(--muted)">grado ${r.de} → <b style="color:var(--g-bueno)">${r.a}</b></span></div>`;
+  const _bc=['#2f6f52','#b8860b','#e08a00','#d23b3b'],_bbg=['#e8f3ec','#fbf4de','#fff3dc','#fce8e8'];
+  const mejrow=r=>{const jp=((r.jump||0)>=1)?` <span style="font-size:10px;font-weight:700;color:${_bc[r.bTo]};background:${_bbg[r.bTo]};padding:1px 7px;border-radius:20px;margin-left:4px;white-space:nowrap">${bandName(r.bFrom)} → ${bandName(r.bTo)}</span>`:'';return `<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="color:var(--g-bueno);font-weight:800">↓</span><div style="flex:1"><b style="font-size:13px">${r.m}</b>${jp}</div><span style="font-size:12px;color:var(--muted)">grado ${r.de} → <b style="color:var(--g-bueno)">${r.a}</b></span></div>`;};
   let ult=MJ.ult.map(mejrow).join("")||`<div style="color:var(--muted);padding:8px 0">Sin descensos en esta inspección</div>`;
   let year=MJ.year.map(mejrow).join("")||`<div style="color:var(--muted);padding:8px 0">—</div>`;
   const tile=(v,l,col,bl)=>`<div class="card k" ${bl?`style="border-left:4px solid ${bl}"`:''}><b style="color:${col}">${v}</b><small>${l}</small></div>`;
@@ -1263,6 +1269,7 @@ function renderStats(){
     <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">Máquinas por área con revisión y grado. En <b style="color:#b06f00">naranja</b> las de atención (5–6) y en <b style="color:#d23b3b">rojo</b> las de peligro (7–10). Pulsa una máquina para ver su análisis.</p>
     <div class="grid3">${watch}</div>
     <h2 style="font-size:17px;margin:24px 0 4px;color:var(--navy)">Mejoras conseguidas</h2>
+    ${MJ.jumps?`<p style="font-size:12.8px;color:#1f6f47;background:#e8f3ec;border-radius:8px;padding:8px 12px;margin:2px 0 10px"><b>${MJ.jumps}</b> máquina(s) han mejorado de color de severidad en el año (p. ej. de naranja a amarillo o verde).</p>`:''}
     <div class="two-col">
       <div class="card pad"><b style="font-size:14px">En la última inspección</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 6px">Puntos cuya vibración ha bajado respecto a la medición anterior.</p>
@@ -1414,11 +1421,23 @@ const TECH_REPORTS={
  "Vibración":[["Informe noviembre 2026","06/11/2026"],["Informe mayo 2026","20/05/2026"],["Informe febrero 2026","02/2026"],["Informe octubre 2025","10/2025"],["Informe julio 2025","07/2025"],["Informe mayo 2025","05/2025"],["Informe febrero 2025","02/2025"],["Informe noviembre 2024","11/2024"]]
 };
 const TECH_ICON_OF={'Vibraciones':'vib','Ultrasonidos':'ultra','Termografía':'ter','Sonido':'son','Alineación':'ali','Equilibrado':'equi','Aceites':'ace','Corriente':'mcsa','Eléctricos':'elec','Espesores':'esp'};
-function clientTechs(c){const set=[];c.plants.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>(m.techs||[]).forEach(t=>{if(set.indexOf(t)<0)set.push(t);}))));return set;}
+function clientTechs(c){const set=[];scopedPlants(c).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>(m.techs||[]).forEach(t=>{if(set.indexOf(t)<0)set.push(t);}))));return set;}
+// "sep.26" -> "Sep. 2026"
+function periodLabel(q){const s=String(q||'').toLowerCase().replace(/\s+/g,'');const mm=s.slice(0,3);let y=(s.match(/\d+/)||['0'])[0];if(y.length<=2)y='20'+('0'+y).slice(-2);return mm.charAt(0).toUpperCase()+mm.slice(1)+'. '+y;}
+// campañas reales (periodos distintos) de una planta para una técnica, más reciente primero; ventana de 12 meses móviles desde el último informe
+function plantPeriods(p,kind){
+  const set=[];
+  p.areas.forEach(a=>a.machines.forEach(m=>{const isT=(m.tmax!==undefined),isV=!!m.vib;if((kind==='termo'&&isT)||(kind==='vib'&&isV)){(m.evo||[]).forEach(e=>{if(e.q&&set.indexOf(e.q)<0)set.push(e.q);});}}));
+  set.sort((a,b)=>qNum(b)-qNum(a));
+  if(set.length){const top=qNum(set[0]);return set.filter(q=>top-qNum(q)<12);} // 12 meses móviles
+  return set;
+}
 function techReports(c,tech){
-  if(tech==='Termografía'){const r=[];c.plants.forEach(p=>r.push(['Informe termografía — '+p.name.replace('Planta ','')+' · sep. 2026','25/09/2026']));r.push(['Informe termografía — Zabaldea · may. 2026','20/05/2026'],['Informe termografía — Zabaldea · feb. 2026','26/02/2026']);return r;}
-  if(tech==='Vibraciones'||tech==='Ultrasonidos') return TECH_REPORTS['Vibración']||[];
-  return TECH_REPORTS[tech]||[];
+  const kind=(tech==='Termografía')?'termo':(tech==='Vibraciones'||tech==='Ultrasonidos')?'vib':null;
+  if(!kind) return TECH_REPORTS[tech]||[];
+  const r=[];
+  scopedPlants(c).forEach(p=>{const pn=p.name.replace('Planta ','');plantPeriods(p,kind).forEach(q=>{const L=periodLabel(q);r.push(['Informe '+tech.toLowerCase()+' — '+pn+' · '+L,L]);});});
+  return r;
 }
 function renderTecnicas(){
   const _cli=DATA.clients.find(x=>x.id===session.clientId);
