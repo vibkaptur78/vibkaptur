@@ -78,8 +78,8 @@
 .cta{margin-top:22px;width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:15px 18px;font-weight:800;font-size:15px;letter-spacing:1.5px;cursor:pointer;box-shadow:0 8px 22px rgba(47,111,82,.45);transition:.15s}
   .cta:hover{background:var(--green-d);transform:translateY(-1px)}
   @media(max-width:1120px){.login-row{gap:16px}.tech-col{gap:11px 12px}.tcol-item{width:78px}.tcol-item span{font-size:10px}.ib{width:50px;height:50px}.tcol-item svg{width:25px;height:25px}}
-  @media(max-width:900px){.login-row{gap:12px}.tech-col{grid-auto-flow:row;grid-template-rows:none;gap:11px}.tcol-item{width:72px}.ib{width:46px;height:46px}.tcol-item svg{width:23px;height:23px}.login{max-width:312px}.login-foot{max-width:312px}}
-  @media(max-width:640px){.login-row{gap:8px}.tcol-item{width:60px}.tcol-item span{font-size:9px;letter-spacing:.4px}.ib{width:40px;height:40px}.tcol-item svg{width:19px;height:19px}.login{max-width:232px}.login-foot{max-width:232px}}
+  @media(max-width:900px){.login-row{gap:12px}.tech-col{grid-auto-flow:row;grid-template-rows:none;gap:11px}.tcol-item{width:72px}.ib{width:46px;height:46px}.tcol-item svg{width:23px;height:23px}.login{max-width:312px}}
+  @media(max-width:640px){.login-row{gap:8px}.tcol-item{width:60px}.tcol-item span{font-size:9px;letter-spacing:.4px}.ib{width:40px;height:40px}.tcol-item svg{width:19px;height:19px}.login{max-width:232px}}
   @media(max-width:470px){.tech-col{display:none}}
   .sidebtn{writing-mode:vertical-rl;text-orientation:mixed;text-transform:uppercase;background:var(--green);color:#fff;font-weight:800;font-size:16.5px;letter-spacing:2.2px;padding:20px 12px;border-radius:11px;text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:1.5px;text-decoration-color:rgba(255,255,255,.55);box-shadow:0 8px 22px rgba(47,111,82,.42);align-self:stretch;display:flex;align-items:center;justify-content:center;transition:.15s;flex:none;z-index:2}
   .sidebtn:hover{background:var(--green-d);transform:translateY(-1px);text-decoration-color:#fff}
@@ -93,7 +93,7 @@
   @media(max-width:560px){.sidewrap{display:none}.login-top b{white-space:normal;font-size:15px;letter-spacing:1px}}
   .login-band{z-index:2;width:auto;max-width:560px;background:rgba(255,255,255,.96);border-radius:10px;padding:7px 18px;text-align:center;box-shadow:0 8px 26px rgba(0,0,0,.26)}
   .login-top{width:100%;max-width:none;margin:0 0 14px;background:var(--navy);padding:11px 22px;border-radius:9px;box-shadow:0 4px 12px rgba(13,45,70,.3);box-sizing:border-box;text-align:center}
-  .login-foot{width:100%;max-width:372px;box-sizing:border-box;margin:12px auto 0}
+  .login-foot{width:100%;max-width:none;box-sizing:border-box;margin:14px 0 0;text-align:center}
   .login p{color:var(--muted);margin:0 0 22px}
   .login .pick{display:grid;gap:12px;text-align:left}
   .pick-card{border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;display:flex;gap:13px;align-items:center;transition:.15s;background:#fff}
@@ -447,12 +447,12 @@ function renderLogin(){
     </div>
     <div class="tech-col">${col(right)}</div>
     </div>
+    <div class="login-foot login-band">
+      <span style="color:var(--navy);font-size:11.5px;letter-spacing:.4px;font-weight:700">Política de calidad · Ingenor Sistemas</span>
+      <a href="https://ingenorsistemas-online.com/politica-de-calidad/" target="_blank" rel="noopener" style="color:var(--green);font-weight:700;font-size:11.5px;margin-left:10px">Ver →</a>
+    </div>
     </div>
     <div class="sidewrap"><div class="sidetag">SUMINISTROS<span class="ar">↓</span></div><a href="https://ingenorsistemas-online.com" target="_blank" rel="noopener" class="sidebtn sidebtn-r" title="ingenorsistemas-online.com">ingenorsistemas-online.com</a></div>
-  </div>
-  <div class="login-foot login-band">
-    <span style="color:var(--navy);font-size:11.5px;letter-spacing:.4px;font-weight:700">Política de calidad · Ingenor Sistemas</span>
-    <a href="https://ingenorsistemas-online.com/politica-de-calidad/" target="_blank" rel="noopener" style="color:var(--green);font-weight:700;font-size:11.5px;margin-left:10px">Ver →</a>
   </div>
   </div>`;
 }
