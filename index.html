@@ -838,7 +838,7 @@ const DEFCOL={'Calentamiento moderado':'#e08a00','Calentamiento leve':'#9acd32',
 function stG(g){return g>=7?'peligro':g>=5?'alerta':g>=3?'seg':'bueno';}
 function famOf(m,kind){ if(kind==='termo') return m.area||'Cuadros';
   const w=(m.name||'').replace(/\(.*?\)/g,'').trim().split(/\s+/); return (w[0]||'Máquinas').charAt(0)+ (w[0]||'').slice(1).toLowerCase(); }
-function msOfKind(plant,kind){const r=[];plant.areas.forEach(a=>a.machines.forEach(m=>{const isV=!!m.vib;if((kind==='vib')===isV)r.push(Object.assign({area:a.name},m));}));return r;}
+function msOfKind(plant,kind){const r=[];plant.areas.forEach(a=>a.machines.forEach(m=>{const isV=(m.tmax===undefined);if((kind==='vib')===isV)r.push(Object.assign({area:a.name},m));}));return r;}
 // Accumulated improvement = dropped over the last-4 measurement window (peak → current). Última = current < previous.
 // banda de color de severidad: verde(1-2) < amarillo(3-4) < naranja(5-6) < rojo(7-10)
 function sevBand(g){return g>=7?3:g>=5?2:g>=3?1:0;}
@@ -1842,7 +1842,7 @@ function periodLabel(q){const s=String(q||'').toLowerCase().replace(/\s+/g,'');c
 // campañas reales (periodos distintos) de una planta para una técnica, más reciente primero; ventana de 12 meses móviles desde el último informe
 function plantPeriods(p,kind){
   const set=[];
-  p.areas.forEach(a=>a.machines.forEach(m=>{const isT=(m.tmax!==undefined),isV=!!m.vib;if((kind==='termo'&&isT)||(kind==='vib'&&isV)){(m.evo||[]).forEach(e=>{if(e.q&&set.indexOf(e.q)<0)set.push(e.q);});}}));
+  p.areas.forEach(a=>a.machines.forEach(m=>{const isT=(m.tmax!==undefined),isV=!isT;if((kind==='termo'&&isT)||(kind==='vib'&&isV)){(m.evo||m.trend||[]).forEach(e=>{const q=e.q||e.l;if(q&&set.indexOf(q)<0)set.push(q);});}}));
   set.sort((a,b)=>qNum(b)-qNum(a));
   if(set.length){const top=qNum(set[0]);return set.filter(q=>top-qNum(q)<12);} // 12 meses móviles
   return set;
