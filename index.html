@@ -434,20 +434,20 @@ function renderLogin(){
   </div>`;
 }
 const USERS=[
-  {email:"admin@ingenorsistemas.com",   pass:"Ingenor-Admin-26",   role:"admin",  name:"Ingenor · Administrador", canUpload:true,  canDownload:true},
-  {email:"tecnico@ingenorsistemas.com", pass:"Ingenor-Tecnico-26", role:"tecnico",name:"Ingenor · Técnico",        canUpload:true,  canDownload:false},
-  {email:"pedro.ortega@ingenorsistemas.com", pass:"pedro2026", role:"admin",  name:"Pedro Ortega · Ingenor", canUpload:true, canDownload:true},
-  {email:"administracion@ingenorsistemas.com", pass:"admin2026", role:"admin", name:"Administración · Ingenor", canUpload:false, canDownload:true},
-  {email:"tecnico1@ingenorsistemas.com", pass:"tecnico1", role:"tecnico", name:"Técnico 1 · Ingenor", canUpload:true, canDownload:false},
-  {email:"tecnico2@ingenorsistemas.com", pass:"tecnico2", role:"tecnico", name:"Técnico 2 · Ingenor", canUpload:true, canDownload:false},
-  {email:"tecnico3@ingenorsistemas.com", pass:"tecnico3", role:"tecnico", name:"Técnico 3 · Ingenor", canUpload:true, canDownload:false},
-  {email:"tecnico4@ingenorsistemas.com", pass:"tecnico4", role:"tecnico", name:"Técnico 4 · Ingenor", canUpload:true, canDownload:false},
-  {email:"direccion@otua.com", pass:"Otua-Director-26", role:"client", clientId:"otua",            name:"OTUA", puesto:"Dirección",            canDownload:true},
-  {email:"zabaldea@otua.com",  pass:"Otua-Zabaldea-26", role:"client", clientId:"otua", plantId:"zabaldea", name:"OTUA", puesto:"Jefe de planta", canDownload:true},
-  {email:"refial@otua.com",    pass:"Otua-Refial-26",   role:"client", clientId:"otua", plantId:"refial",   name:"OTUA", puesto:"Jefe de planta", canDownload:true},
-  {email:"resal@otua.com",     pass:"Otua-Resal-26",    role:"client", clientId:"otua", plantId:"resal",    name:"OTUA", puesto:"Jefe de planta", canDownload:true},
-  {email:"reydesa@otua.com",   pass:"Otua-Reydesa-26",  role:"client", clientId:"otua", plantId:"reydesa",  name:"OTUA", puesto:"Jefe de planta", canDownload:true},
-  {email:"direccion@elis.com", pass:"Elis-Director-26", role:"client", clientId:"elis",            name:"ELIS", puesto:"Dirección",            canDownload:true}
+  {email:"admin@ingenorsistemas.com",   pass:"ttfN3Nk#4@JB",   role:"admin",  name:"Ingenor · Administrador", canUpload:true,  canDownload:true},
+  {email:"tecnico@ingenorsistemas.com", pass:"5gWfkjEJAUp-", role:"tecnico",name:"Ingenor · Técnico",        canUpload:true,  canDownload:false},
+  {email:"pedro.ortega@ingenorsistemas.com", pass:"ZrymRvsa9#yU", role:"admin",  name:"Pedro Ortega · Ingenor", canUpload:true, canDownload:true},
+  {email:"administracion@ingenorsistemas.com", pass:"u#X!PqumN8#9", role:"admin", name:"Administración · Ingenor", canUpload:false, canDownload:true},
+  {email:"tecnico1@ingenorsistemas.com", pass:"WB5HRXg2XEf+", role:"tecnico", name:"Técnico 1 · Ingenor", canUpload:true, canDownload:false},
+  {email:"tecnico2@ingenorsistemas.com", pass:"ZTfe3y4BiiF@", role:"tecnico", name:"Técnico 2 · Ingenor", canUpload:true, canDownload:false},
+  {email:"tecnico3@ingenorsistemas.com", pass:"yjpP%Wy6BR9C", role:"tecnico", name:"Técnico 3 · Ingenor", canUpload:true, canDownload:false},
+  {email:"tecnico4@ingenorsistemas.com", pass:"EmM%BP+tF9CA", role:"tecnico", name:"Técnico 4 · Ingenor", canUpload:true, canDownload:false},
+  {email:"direccion@otua.com", pass:"!#MAC5f5GZe-", role:"client", clientId:"otua",            name:"OTUA", puesto:"Dirección",            canDownload:true},
+  {email:"zabaldea@otua.com",  pass:"8GsrPKTt!KDh", role:"client", clientId:"otua", plantId:"zabaldea", name:"OTUA", puesto:"Jefe de planta", canDownload:true},
+  {email:"refial@otua.com",    pass:"P@23sUkdzRUw",   role:"client", clientId:"otua", plantId:"refial",   name:"OTUA", puesto:"Jefe de planta", canDownload:true},
+  {email:"resal@otua.com",     pass:"9ZrPp@BjGmTP",    role:"client", clientId:"otua", plantId:"resal",    name:"OTUA", puesto:"Jefe de planta", canDownload:true},
+  {email:"reydesa@otua.com",   pass:"#bEjs5*%nirS",  role:"client", clientId:"otua", plantId:"reydesa",  name:"OTUA", puesto:"Jefe de planta", canDownload:true},
+  {email:"direccion@elis.com", pass:"Y6*KpNGa*QSg", role:"client", clientId:"elis",            name:"ELIS", puesto:"Dirección",            canDownload:true}
 ];
 function startSession(u, remember){
   const cl=u.clientId?DATA.clients.find(c=>c.id===u.clientId):null;
@@ -606,14 +606,14 @@ function renderPlant(){
   const _areaTech=a=>a.machines.some(m=>m.vib)?0:(a.machines.some(m=>m.tmax!==undefined||(m.techs||[]).includes('Termografía'))?1:2);
   const areasOrdered=(currentTech==='Global')?[...p.areas].sort((x,y)=>_areaTech(x)-_areaTech(y)):p.areas;
   areasOrdered.forEach((a,ai)=>{
+    const areaMs=a.machines.filter(m=> currentTech==="Global" || (m.techs||[]).includes(currentTech));
+    if(!areaMs.length) return; // en esta pestaña (técnica) esta área no tiene equipos
     const open=openAreas[a.name]!==false;
-    const worst=a.machines.reduce((w,m)=>stOrder(m.state)>stOrder(w)?m.state:w,"bueno");
+    const worst=areaMs.reduce((w,m)=>stOrder(m.state)>stOrder(w)?m.state:w,"bueno");
     out+=`<tr class="area-row ${open?'open':''}" onclick="toggleArea('${a.name.replace(/'/g,"")}')">
       <td><span class="chev">▶</span> ${a.name}</td><td></td><td>${pill(worst)}</td><td></td><td></td></tr>`;
     if(open){
-      a.machines.forEach(m=>{
-        const visible = currentTech==="Global" || m.techs.includes(currentTech);
-        if(!visible) return;
+      areaMs.forEach(m=>{
         out+=`<tr class="m-row" onclick="go({name:'machine',cid:'${view.cid}',pid:'${view.pid}',mid:'${m.id}'})">
           <td class="m-name">${m.name}</td>
           <td style="color:var(--muted);font-size:12px">${m.tmax!==undefined?("Máx "+m.tmax+" °C"):(m.vib?("Grado "+m.grade+"/10"):m.techs.join(" · "))}</td>
@@ -1021,18 +1021,6 @@ function renderStatsTermo(){
       <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#e08a00">${seg+alerta+peligro}</div><small style="color:var(--muted)">Con calentamiento</small></div>
       <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#d23b3b">${hot?parseFloat(hot.tmax).toFixed(0)+'°':'—'}</div><small style="color:var(--muted)">Tª máx (${hot?hot.plant.replace('Planta ',''):''})</small></div>
     </div>`;
-  // Ahorro económico estimado (metal + termografía, con acumulado del año)
-  const SVO=savingsOtua(PL);
-  out+=`<div class="card pad" style="border-left:4px solid #2f6f52;margin-bottom:16px">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:15px">Ahorro económico estimado</b><span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span></div>
-    <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Ahorro realizado: solo cuenta cuando un equipo <b>ha bajado</b> de grado (vibraciones) o de temperatura (termografía) tras detectar el problema, una vez por bajada.</p>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <div style="background:#e8f3ec;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:#2f6f52;line-height:1">${eur(SVO.cur)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">esta campaña</div></div>
-      <div style="background:#eef4fb;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:var(--navy);line-height:1">${eur(SVO.yr)}</div><div style="font-size:11px;color:#334;margin-top:3px">acumulado 2026</div></div>
-    </div>
-    ${SVO.perPlant.length>1?`<table style="margin-top:10px;font-size:12.5px"><thead><tr><th>Planta</th><th style="text-align:right">Esta campaña</th><th style="text-align:right">Acumulado 2026</th></tr></thead><tbody>${SVO.perPlant.map(x=>`<tr><td><b>${x.name}</b></td><td style="text-align:right">${eur(x.cur)}</td><td style="text-align:right">${eur(x.yr)}</td></tr>`).join('')}</tbody></table>`:''}
-    <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: cada bajada de grado/temperatura cuenta el fallo que se evitó = probabilidad de fallo del nivel del que baja × sobrecoste de una parada no planificada por clase de equipo (banda metal/reciclaje). No se suma cada inspección en que aparece el problema, solo las bajadas; el acumulado recorre el histórico de 2026. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
-  </div>`;
   // per-plant table
   out+=`<div class="card" style="margin-bottom:16px"><div class="pad"><b style="font-size:14px">Resumen por planta</b></div>
     <table><thead><tr><th>Planta</th><th>Cuadros</th><th>Bueno</th><th>Segui.</th><th>Alerta</th><th>Tª máx</th></tr></thead><tbody>`;
@@ -1074,6 +1062,19 @@ function renderStatsTermo(){
     }
   }
   out+=renderVibStats(PL);
+  const SVO=savingsOtua(PL); const POTO=savPotentialOtua(PL);
+  out+=`<div class="card pad" style="border-left:4px solid #2f6f52;margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:15px">Ahorro económico estimado</b><span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span></div>
+    <div style="background:#e8f3ec;border-radius:12px;padding:14px 20px;display:inline-block;margin:6px 0 4px"><div style="font-size:26px;font-weight:800;color:#2f6f52;line-height:1">${eur(SVO.yr)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro realizado · acumulado 2026</div></div>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0">Averías/puntos calientes detectados y <b>ya corregidos</b> (han bajado de grado o de temperatura), evitando la parada. Suma de todas las bajadas del año.</p>
+    ${SVO.perPlant.length>1?`<table style="margin-top:12px;font-size:12.5px"><thead><tr><th>Planta</th><th style="text-align:right">Realizado 2026</th></tr></thead><tbody>${SVO.perPlant.map(x=>`<tr><td><b>${x.name}</b></td><td style="text-align:right">${eur(x.yr)}</td></tr>`).join('')}</tbody></table>`:''}
+    ${POTO.items.length?`<div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:14px;color:#b45309">⚠ Fallos potenciales detectados</b><span style="font-size:12px;color:#92400e">${POTO.items.length} equipos · potencial ${eur(POTO.total)}</span></div>
+      <p style="font-size:11.5px;color:var(--muted);margin:4px 0 8px">Detectados a tiempo pero <b>aún por corregir</b>: todavía no cuentan como ahorro realizado, pero al actuar se <b>evita la parada y el fallo catastrófico</b>.</p>
+      ${POTO.items.slice(0,10).map(it=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f1f1f1;font-size:12.5px"><div><span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:10px">${it.label}</span> ${it.name}</div><div style="color:#334;white-space:nowrap">potencial <b>${eur(it.val)}</b></div></div>`).join('')}
+    </div>`:''}
+    <p style="font-size:11px;color:var(--muted);margin:12px 0 0">Método: a cada bajada (realizado) y a cada fallo potencial detectado (pendiente) se le asigna probabilidad de fallo × sobrecoste de una parada no planificada por clase de equipo (banda metal/reciclaje). Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
+  </div>`;
   out+=`</main>`;
   return out;
 }
@@ -1374,6 +1375,7 @@ function renderStats(){
   const _EMS=[]; (_c?scopedPlants(_c):[]).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>_EMS.push({name:a.name+' · '+m.name,trend:m.trend,evo:m.evo}))));
   const MJ=calcMej(_EMS);
   const SV=savingsModel(_c);
+  const POT=savPotential(_c);
   let parosEvit=0; _EMS.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});
   let bars=STATS.map(s=>statBar(s.label,{bueno:s.bueno,seg:s.seg,alerta:s.alerta,peligro:s.peligro})).join("");
   const fmax=Math.max(...S.byfen.map(x=>x.n));
@@ -1419,18 +1421,6 @@ function renderStats(){
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">↓ ${MJ.ult.length}</b><small style="color:#cfe0ee">Han bajado en la última inspección</small></div>
       </div>
     </div>
-    <div class="card pad" style="border-left:4px solid var(--g-bueno);margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
-        <b style="font-size:15px">Ahorro económico estimado</b>
-        <span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span>
-      </div>
-      <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Ahorro realizado: solo cuenta cuando un equipo <b>ha bajado de grado</b> (problema detectado y corregido), una vez por bajada.</p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <div style="background:#e8f3ec;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:var(--g-bueno);line-height:1">${eur(SV.cur)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">esta campaña</div></div>
-        <div style="background:#eef4fb;border-radius:12px;padding:12px 20px"><div style="font-size:24px;font-weight:800;color:var(--navy);line-height:1">${eur(SV.yr)}</div><div style="font-size:11px;color:#334;margin-top:3px">acumulado 2026</div></div>
-      </div>
-      <p style="font-size:11px;color:var(--muted);margin:10px 0 0">Método: cada vez que un equipo baja de grado se cuenta el fallo que se evitó = probabilidad de fallo del grado del que baja × sobrecoste de una parada no planificada frente a la planificada, por clase de equipo. No se suma cada inspección en que aparece el problema, solo las bajadas. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
-    </div>
     <div class="two-col">
       <div class="card pad"><b style="font-size:14px">Evolución del estado</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 2px">Máquinas por estado en cada inspección trimestral.</p>
@@ -1453,6 +1443,20 @@ function renderStats(){
       <div class="card pad"><b style="font-size:14px">Acumuladas en el año</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 6px">Puntos que han bajado de grado respecto al inicio del año.</p>
         ${year}</div>
+    </div>
+    <div class="card pad" style="border-left:4px solid var(--g-bueno);margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+        <b style="font-size:15px">Ahorro económico estimado</b>
+        <span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span>
+      </div>
+      <div style="background:#e8f3ec;border-radius:12px;padding:14px 20px;display:inline-block;margin:6px 0 4px"><div style="font-size:26px;font-weight:800;color:var(--g-bueno);line-height:1">${eur(SV.yr)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro realizado · acumulado 2026</div></div>
+      <p style="font-size:11px;color:var(--muted);margin:6px 0 0">Averías detectadas a tiempo y <b>ya corregidas</b> (han bajado de grado), evitando la parada. Suma de todas las bajadas del año.</p>
+      ${POT.items.length?`<div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:14px;color:#b45309">⚠ Fallos potenciales detectados</b><span style="font-size:12px;color:#92400e">${POT.items.length} equipos · potencial ${eur(POT.total)}</span></div>
+        <p style="font-size:11.5px;color:var(--muted);margin:4px 0 8px">Detectados a tiempo pero <b>aún por corregir</b>: todavía no cuentan como ahorro realizado, pero al actuar se <b>evita la parada y el fallo catastrófico</b>.</p>
+        ${POT.items.slice(0,8).map(it=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f1f1f1;font-size:12.5px"><div><span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:10px">Grado ${it.grade}</span> ${it.name}</div><div style="color:#334;white-space:nowrap">potencial <b>${eur(it.val)}</b></div></div>`).join('')}
+      </div>`:''}
+      <p style="font-size:11px;color:var(--muted);margin:12px 0 0">Método: a cada bajada de grado (realizado) y a cada fallo potencial detectado (pendiente) se le asigna probabilidad de fallo × sobrecoste de una parada no planificada por clase de equipo. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
     </div>
   </main>`;
 }
@@ -1483,6 +1487,21 @@ function savingsModel(c){
     }
   })));
   return {cur:cur,yr:yr};
+}
+/* Fallos potenciales detectados (ELIS/vibraciones): equipos importantes (grado>=5)
+   detectados pero que AUN no han bajado -> se resaltan como fallo potencial evitado al corregir. */
+function savPotential(c){
+  var total=0, items=[];
+  if(c) scopedPlants(c).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
+    var g=m.grade||0; if(g<5) return;
+    var tr=m.trend||[], dropped=false;
+    if(tr.length>=2 && tr[tr.length-1].g!=null && tr[tr.length-2].g!=null) dropped=tr[tr.length-1].g<tr[tr.length-2].g;
+    if(dropped) return; // ya ha bajado -> es ahorro realizado, no potencial abierto
+    var d=SAV_DELTA[savClass(m.name)]||5000, val=savP(g)*d;
+    total+=val; items.push({name:a.name+' · '+m.name, grade:g, val:val});
+  });});});
+  items.sort(function(x,y){return y.val-x.val;});
+  return {total:total, items:items};
 }
 /* ===== Modelo de ahorro OTUA (metal/reciclaje: vibraciones + termografía, con acumulado del año) ===== */
 const SAVO_T=10000;
@@ -1517,6 +1536,29 @@ function savingsOtua(PL){
     perPlant.push({name:p.name.replace('Planta ',''),cur:pc,yr:py});cur+=pc;yr+=py;
   });
   return {cur:cur,yr:yr,perPlant:perPlant};
+}
+/* Fallos potenciales detectados OTUA: vibraciones grado>=5 o cuadros >=85C que AUN no han bajado. */
+function savPotentialOtua(PL){
+  var total=0, items=[];
+  (PL||[]).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
+    var isvib=(m.tmax===undefined||m.tmax===null||m.tmax==='')&&(m.grade!=null);
+    var ev=m.evo||[];
+    if(isvib){var g=m.grade||0; if(g<5) return;
+      var dr=false; var gs=ev.filter(function(e){return e.g!=null;});
+      if(gs.length>=2) dr=gs[gs.length-1].g<gs[gs.length-2].g;
+      if(dr) return;
+      var d=savoDvib(m.name), val=savoPvib(g)*d; total+=val;
+      items.push({name:p.name.replace('Planta ','')+' · '+m.name, label:'Grado '+g, val:val});
+    } else { var t=parseFloat(m.tmax); if(isNaN(t)||t<85) return;
+      var dt=false; var ts=ev.filter(function(e){return e.t!=null;});
+      if(ts.length>=2) dt=ts[ts.length-1].t<ts[ts.length-2].t;
+      if(dt) return;
+      var dd=SAVO_T, vv=savoPtemp(t)*dd; total+=vv;
+      items.push({name:p.name.replace('Planta ','')+' · '+m.name, label:t.toFixed(0)+' °C', val:vv});
+    }
+  });});});
+  items.sort(function(x,y){return y.val-x.val;});
+  return {total:total, items:items};
 }
 function statBar(label,n){
   const tot=n.bueno+n.seg+n.alerta+n.peligro||1;const h=v=>Math.round(v/tot*130);
