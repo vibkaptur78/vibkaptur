@@ -846,6 +846,69 @@ function statsBlockEl(title,sub,B,cid,pid){
     ${B.mejJumps?`<p style="font-size:12.8px;color:#1f6f47;background:#e8f3ec;border-radius:8px;padding:8px 12px;margin:2px 0 10px"><b>${B.mejJumps}</b> máquina(s) han mejorado de color de severidad en el año (p. ej. de naranja a amarillo o verde).</p>`:''}
     <div class="two-col"><div class="card pad"><b style="font-size:14px">En la última inspección</b>${ult}</div><div class="card pad"><b style="font-size:14px">Acumuladas (año)</b>${year}</div></div>`;
 }
+function generarInforme(){
+  const c=DATA.clients.find(x=>x.id===(session.role==='admin'?view.cid:session.clientId));
+  if(!c){ toast('No hay datos para el informe.'); return; }
+  const PL=scopedPlants(c);
+  const hoy=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+  const unaPlanta=(PL.length===1);
+  let tot=0,bueno=0,averias=0,paros=0,bajadas=0,saltos=0; const bloques=[];
+  PL.forEach(p=>{
+    [['vib','Vibraciones'],['termo','Termografía']].forEach(function(t){
+      const ms=msOfKind(p,t[0]); if(!ms.length) return;
+      const B=bundle(ms,t[0]);
+      tot+=B.tot; bueno+=B.n.bueno; averias+=B.averiasDet; paros+=B.parosEvit; bajadas+=B.mejYearL.length; saltos+=B.mejJumps;
+      bloques.push({plant:p.name,tec:t[1],B});
+    });
+  });
+  const okpct=tot?Math.round(bueno/tot*100):0;
+  const _bc=['#2f6f52','#b8860b','#e08a00','#d23b3b'],_bbg=['#e8f3ec','#fbf4de','#fff3dc','#fce8e8'];
+  const mejrow=r=>{const jp=((r.jump||0)>=1)?` <span style="font-size:10px;font-weight:700;color:${_bc[r.bTo]};background:${_bbg[r.bTo]};padding:1px 7px;border-radius:20px;white-space:nowrap">${bandName(r.bFrom)} → ${bandName(r.bTo)}</span>`:'';return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2f6;font-size:12.5px"><span style="color:#2f6f52;font-weight:800">↓</span><div style="flex:1">${r.m} ${jp}</div><span style="color:#64748b">grado ${r.de} → <b style="color:#2f6f52">${r.a}</b></span></div>`;};
+  const kpi=(v,l,col)=>`<div style="flex:1;min-width:120px;background:#f6f8fb;border:1px solid #e6ecf2;border-radius:10px;padding:12px 14px"><div style="font-size:24px;font-weight:800;color:${col||'#0d2d46'};line-height:1">${v}</div><div style="font-size:11.5px;color:#64748b;margin-top:4px">${l}</div></div>`;
+  const bloquesHTML=bloques.map(bl=>{const B=bl.B;
+    const mejoras=B.mejYearL.length?B.mejYearL.map(mejrow).join(''):'<div style="color:#8a98a6;font-size:12px;padding:6px 0">Sin cambios de severidad en el periodo.</div>';
+    return `<div style="break-inside:avoid;border:1px solid #e6ecf2;border-radius:12px;padding:15px 18px;margin:0 0 14px">
+      <div style="font-weight:800;font-size:15px;color:#0d2d46">${bl.plant} · ${bl.tec}</div>
+      <div style="font-size:12px;color:#475569;margin:3px 0 9px">${B.tot} ${bl.tec==='Vibraciones'?'máquinas':'cuadros'} · ${B.okpct}% en buen estado · ${B.averiasDet} detectadas a tiempo · ${B.parosEvit} paros evitados</div>
+      <div style="font-size:12px;color:#334155"><b>Reparto actual:</b> <span style="color:#2f6f52">■</span> Bueno ${B.n.bueno} · <span style="color:#e08a00">■</span> Atención ${B.n.alerta} · <span style="color:#d23b3b">■</span> Peligro ${B.n.peligro}</div>
+      <div style="margin-top:9px;font-weight:700;font-size:12.5px;color:#334155">Mejoras conseguidas</div>${mejoras}
+    </div>`;
+  }).join('')||'<div style="color:#8a98a6">Sin técnicas con datos.</div>';
+  const concl=`Durante el seguimiento, el mantenimiento predictivo ha permitido <b>detectar a tiempo ${averias} incidencia(s)</b> antes de que provocaran una avería y <b>evitar ${paros} parada(s) no programada(s)</b>. <b>${bajadas} equipo(s)</b> han reducido su nivel de severidad y <b>${saltos}</b> han mejorado de banda de color (por ejemplo, de naranja a verde). Actualmente el <b>${okpct}%</b> del parque está en buen estado. Estos resultados reflejan el valor de anticiparse al fallo frente a reparar tras la avería: menos paradas imprevistas, intervenciones planificadas y mayor vida útil de los equipos.`;
+  const html=`<div id="informe"><style>
+    @media print{ body>*:not(#informe){display:none!important} #informe{position:static!important;background:#fff!important;padding:0!important} .noprint{display:none!important} @page{margin:13mm} }
+    #informe{position:fixed;inset:0;background:#e9edf2;overflow:auto;z-index:10000;padding:22px}
+    #informe .sheet{max-width:820px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.18);padding:34px 40px;font-family:inherit;color:#1f2d3a}
+  </style>
+    <div class="noprint" style="max-width:820px;margin:0 auto 14px;display:flex;gap:9px;justify-content:flex-end">
+      <button class="btn ghost" onclick="var e=document.getElementById('informe');if(e)e.remove()">Cerrar</button>
+      <button class="btn" style="background:var(--green)" onclick="window.print()">⤓ Descargar / Imprimir PDF</button>
+    </div>
+    <div class="sheet">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0d2d46;padding-bottom:14px;margin-bottom:18px">
+        <div><div style="font-size:12px;letter-spacing:3px;color:#2f6f52;font-weight:800">INGENOR · VIBKAPTUR</div>
+          <div style="font-size:22px;font-weight:800;color:#0d2d46;margin-top:3px">Informe de resultados</div>
+          <div style="font-size:13px;color:#475569">Mantenimiento predictivo — ${c.name}${unaPlanta?' · '+PL[0].name:''}</div></div>
+        <div style="text-align:right;font-size:11.5px;color:#64748b">Generado el<br><b style="color:#0d2d46">${hoy}</b></div>
+      </div>
+      <div style="background:#f0f6f2;border-left:4px solid #2f6f52;border-radius:8px;padding:12px 15px;font-size:12.5px;color:#334155;margin-bottom:18px">
+        <b>¿Qué aporta el mantenimiento predictivo?</b> En lugar de reparar cuando el equipo ya ha fallado, se mide su estado de forma periódica (vibraciones, termografía…) para <b>detectar el problema en su fase inicial</b>. Así se interviene de forma planificada, se evitan paradas imprevistas y se alarga la vida de la máquina.
+      </div>
+      <div style="font-weight:800;font-size:15px;color:#0d2d46;margin-bottom:10px">Resumen de resultados</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">
+        ${kpi(tot,'Equipos monitorizados')}${kpi(okpct+'%','En buen estado','#2f6f52')}${kpi(averias,'Averías detectadas a tiempo','#e08a00')}${kpi(paros,'Paros no programados evitados','#0d2d46')}${kpi('↓ '+bajadas,'Equipos con severidad reducida','#2f6f52')}${kpi(saltos,'Saltos de color de gravedad','#2f6f52')}
+      </div>
+      <div style="font-weight:800;font-size:15px;color:#0d2d46;margin-bottom:10px">Detalle por planta y técnica</div>
+      ${bloquesHTML}
+      <div style="font-weight:800;font-size:15px;color:#0d2d46;margin:6px 0 8px">Conclusión</div>
+      <p style="font-size:12.8px;color:#334155;line-height:1.7;margin:0 0 20px">${concl}</p>
+      <div style="border-top:1px solid #e6ecf2;padding-top:12px;font-size:11px;color:#8a98a6;display:flex;justify-content:space-between">
+        <span>Ingenor Sistemas · VIBKAPTUR — Mantenimiento predictivo</span><span>${hoy}</span>
+      </div>
+    </div></div>`;
+  const prev=document.getElementById('informe'); if(prev)prev.remove();
+  const d=document.createElement('div'); d.innerHTML=html; document.body.appendChild(d.firstChild);
+}
 function dashBlockEl(title,sub,B,ms,cid,pid){
   const tot=B.tot,n=B.n;const seg=[["#1f9d55",n.bueno],["#9acd32",n.seg],["#f0a500",n.alerta],["#dc3545",n.peligro]];
   let acc=0,stops=[];seg.forEach(([col,v])=>{const a=acc/tot*360,b=(acc+v)/tot*360;if(v)stops.push(`${col} ${a.toFixed(1)}deg ${b.toFixed(1)}deg`);acc+=v;});
@@ -876,6 +939,7 @@ function renderOtuaView(mode){
     plants=[...PL].sort((a,b)=>scoreOf(b)-scoreOf(a));
   }
   let out=`<main><h1>${mode==='stats'?'Estadísticas':'Análisis'} — ${c.name}</h1><p class="sub">${mode==='stats'?'Plantas ordenadas por las que más han mejorado (más máquinas con severidad reducida). ':''}En las plantas con varias técnicas, primero vibraciones y luego termografía.</p>`;
+  if(mode==='stats') out+=`<div class="noprint" style="margin:2px 0 16px"><button class="btn" onclick="generarInforme()" style="background:var(--green)">📄 Generar informe de resultados (PDF)</button> <span style="color:var(--muted);font-size:12px;margin-left:6px">Resumen descargable de las mejoras conseguidas con el mantenimiento predictivo.</span></div>`;
   plants.forEach(p=>{
     out+=`<div style="margin:18px 0 6px;padding:8px 14px;background:var(--navy);color:#fff;border-radius:10px;font-weight:700">${p.name}</div>`;
     const vib=msOfKind(p,'vib'), ter=msOfKind(p,'termo');
@@ -1268,6 +1332,7 @@ function renderStats(){
   return `<main>
     <h1>Estadísticas — Planta ELIS</h1>
     <p class="sub">Seguimiento trimestral (feb · may · ago · nov 2026) · ${S.tot} máquinas monitorizadas.</p>
+    <div class="noprint" style="margin:2px 0 16px"><button class="btn" onclick="generarInforme()" style="background:var(--green)">📄 Generar informe de resultados (PDF)</button> <span style="color:var(--muted);font-size:12px;margin-left:6px">Resumen descargable de las mejoras conseguidas con el mantenimiento predictivo.</span></div>
     <div class="kpi">
       ${tile(S.tot,'Máquinas analizadas','var(--navy)')}
       ${tile(S.okpct+'%','En buen estado','var(--g-bueno)')}
