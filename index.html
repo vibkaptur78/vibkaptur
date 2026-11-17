@@ -323,6 +323,23 @@ function doUpload(cid){
     else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que tengas permiso de subida y que sea un PDF.'); }
   }).catch(function(){ msg('Error de conexión al subir el PDF.'); });
 }
+function doUploadWord(cid){
+  var inp=document.getElementById('wordFile');
+  var st=document.getElementById('upStatusW');
+  function msg(t){ if(st)st.innerHTML=t; }
+  if(!inp||!inp.files||!inp.files.length){ msg('Elige primero el Word (.docx) de termografías.'); return; }
+  var f=inp.files[0];
+  if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
+  if(!/\.docx$/i.test(f.name)){ msg('El archivo debe ser un Word <b>.docx</b>.'); return; }
+  if(f.size>40*1024*1024){ msg('El Word es demasiado grande (máx. 40 MB).'); return; }
+  msg('Subiendo <b>'+f.name+'</b>…');
+  var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('file',f);
+  fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
+    if(j&&j.ok&&j.kind==='docx'){ msg('✅ Word recibido ('+Math.round(j.bytes/1024)+' KB). Queda <b>pendiente de procesar</b>: se revisa ortografía y congruencia, se extraen las fotos y se montan los cuadros en la planta.'); }
+    else if(j&&j.ok){ msg('Subido, pero no se reconoció como Word (.docx).'); }
+    else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que sea un .docx y que tengas permiso de subida.'); }
+  }).catch(function(){ msg('Error de conexión al subir el Word.'); });
+}
 function doDownload(){
   if(session&&session.canDownload===false){ toast('La descarga del informe es exclusiva del cliente y de administración.'); return; }
   var c=(session&&session.role==='client')?session.clientId:((view&&view.cid)||(session&&session.clientId)||'elis');
@@ -1289,8 +1306,11 @@ function renderUpload(){
           <button class="btn" style="width:100%" onclick="doUpload('${cid}')">⬆ Subir y publicar el PDF de ${cn}</button>
           <div id="upStatus" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px">Este PDF queda guardado como el informe que descargará el cliente (sustituye al anterior).</div></div>
-        <div class="field"><label>Imágenes de termografía (térmica + real, por cuadro)</label>
-          <div class="uploader">🌡️ Arrastra aquí las <b>imágenes térmicas y reales</b><br><span style="font-size:12px">Solo las de los cuadros con anomalía. Cada par (térmica + foto real) se coloca solo en la ficha de su máquina.</span></div></div>
+        <div class="field"><label>Informe de termografías (Word .docx) — un único archivo por planta</label>
+          <input type="file" id="wordFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
+          <button class="btn" style="width:100%" onclick="doUploadWord('${cid}')">🌡️ Subir el Word de termografías</button>
+          <div id="upStatusW" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">El Word lleva dentro los cuadros y sus fotos (térmica + real). Al procesarlo se revisa ortografía y congruencia, se extraen las fotos y se montan los cuadros con su grado, temperatura y evolución.</div></div>
         <div style="font-size:11.5px;color:var(--muted);line-height:1.5">Vale subir la carpeta entera del mes. Las máquinas que ese mes salgan como <b>“no medido”</b> se respetan: no puntúan y mantienen su última medida.</div>
       </div>
       <div class="card pad">
