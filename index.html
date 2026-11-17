@@ -90,7 +90,7 @@
   .sidetag .ar{display:block;color:#7ee0a6;font-size:16px;line-height:.7;margin-top:3px}
   @media(max-width:560px){.sidewrap{display:none}}
   .login-band{z-index:2;width:auto;max-width:560px;background:rgba(255,255,255,.96);border-radius:10px;padding:7px 18px;text-align:center;box-shadow:0 8px 26px rgba(0,0,0,.26)}
-  .login-top{margin:0 auto 12px}
+  .login-top{width:100%;max-width:1180px;margin:0 auto 18px;background:linear-gradient(120deg,var(--navy) 0%,#17567f 55%,var(--green-d) 150%);padding:15px 28px;border-radius:13px;box-shadow:0 12px 34px rgba(9,29,46,.42)}
   .login-foot{margin:12px auto 0}
   .login p{color:var(--muted);margin:0 0 22px}
   .login .pick{display:grid;gap:12px;text-align:left}
@@ -419,7 +419,7 @@ function renderLogin(){
   const left=TECH_ICONS.slice(0,8), right=TECH_ICONS.slice(8);
   return `<div class="login-wrap">
   <div class="login-top login-band">
-    <b style="color:var(--navy);font-size:15px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase">Plataforma de diagnóstico multitécnica</b>
+    <b style="color:#fff;font-size:20px;font-weight:800;letter-spacing:3px;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,.3)">Plataforma de diagnóstico multitécnica</b>
   </div>
   <div class="login-row">
     <div class="sidewrap"><div class="sidetag">SERVICIOS<span class="ar">↓</span></div><a href="https://ingenorsistemas.com" target="_blank" rel="noopener" class="sidebtn sidebtn-l" title="ingenorsistemas.com">ingenorsistemas.com</a></div>
