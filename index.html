@@ -532,6 +532,7 @@ function renderHeader(){
     ? `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Plantas</a>
        <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
        <a onclick="go({name:'dash',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='dash'?'active':''}">Análisis</a>
+       <a onclick="go({name:'stats',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>
        <a onclick="go({name:'upload'})" class="${view.name==='upload'?'active':''}">Subir informe</a>
        <a onclick="go({name:'users'})" class="${view.name==='users'?'active':''}">Clientes y accesos</a>`
     : `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Mis plantas</a>
