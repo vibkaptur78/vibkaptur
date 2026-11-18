@@ -1295,14 +1295,15 @@ function renderMachine(){
       <div><h1>${m.name}</h1><p class="sub">${p.name} · Área: ${m.area}</p></div>
       ${session.role==='admin'?`<button class="btn" onclick="editState('${m.id}','${m.name.replace(/'/g,"")}','${m.state}')">✎ Editar estado</button>`:''}
     </div>
-    ${m.nomedido?`<div class="card pad" style="margin:4px 0 0;background:#f1f3f5;border-left:4px solid #9aa5b1;color:#4a5560"><b style="color:#5a6673">⊘ No medido en la última inspección</b><div style="font-size:12.8px;margin-top:4px;line-height:1.6">Esta máquina no se midió en la última visita. Se muestra su <b>último diagnóstico disponible</b>; no entra en la comparativa ni en las estadísticas de esta inspección hasta que se vuelva a medir.</div></div>`:''}
+    ${m.nomedido?`<div class="card pad" style="margin:4px 0 0;background:#f1f3f5;border-left:4px solid #9aa5b1;color:#4a5560"><b style="color:#5a6673">⊘ No medido en la última inspección</b><div style="font-size:12.8px;margin-top:4px;line-height:1.6">${m.placeholder?'Esta máquina figura en el informe como <b>no medida</b> y aún no tiene análisis en la plataforma. Su diagnóstico aparecerá en cuanto se realice una medición.':'Esta máquina no se midió en la última visita. Se muestra su <b>último diagnóstico disponible</b>; no entra en la comparativa ni en las estadísticas de esta inspección hasta que se vuelva a medir.'}</div></div>`:''}
     <div class="m-states">
       <div class="state-box"><small>Estado</small>${pill(m.state)}</div>
-      <div class="state-box"><small>Severidad máxima</small><b>Grado ${m.grade}/10</b></div>
-      <div class="state-box"><small>Inspección</small><b>${m.insp}</b></div>
+      <div class="state-box"><small>Severidad máxima</small><b>${m.grade!=null?('Grado '+m.grade+'/10'):'—'}</b></div>
+      <div class="state-box"><small>Inspección</small><b>${m.insp||'—'}</b></div>
       ${m.hasValues&&m.maxrms!=null?`<div class="state-box"><small>Vibración más alta</small><b>${String(m.maxrms).replace('.',',')} mm/s</b></div>`:''}
       ${m.rec?`<div class="state-box" style="border-color:#f0c67d;background:#fffaf0"><small>Recomendación</small><b style="font-size:12.5px">${m.rec}</b></div>`:''}
     </div>`;
+  if(m.placeholder) return out+`</main>`;
   const comps=m.comps||[]; const edates=m.edates||[];
   const sevChart = comps.length ? `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><div style="flex:1 1 300px;min-width:240px">${trendMulti(comps,edates)}</div>${sevLegendSide(comps)}</div>` : (m.trend&&m.trend.length>1?trendChart(m.trend):"");
   const sevSub='Una línea por componente (motor, molino, reductora…), con el grado máximo de severidad de cada uno y su fenómeno vibratorio predominante. Bandas: verde seguimiento, ámbar atención, rojo peligro.';
