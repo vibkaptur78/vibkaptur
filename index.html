@@ -228,6 +228,7 @@ const STATES={
   vigilar:{label:"Vigilar",pill:"s-seg",dot:"d-seg"},
   critico:{label:"Crítico",pill:"s-peligro",dot:"d-peligro"},
   mant:{label:"No medido",pill:"s-mant",dot:"d-mant"},
+  nomedido:{label:"No medido",pill:"s-mant",dot:"d-mant"},
 };
 const TECHS=["Global","Vibraciones"];
 let DATA={clients:[]};  // datos vienen del servidor (datos.php) tras login
@@ -875,8 +876,9 @@ function bundle(ms,kind){
   const n={bueno:0,seg:0,alerta:0,peligro:0,mant:0};
   ms.forEach(m=>{n[m.state]=(n[m.state]||0)+1;});
   const tot=ms.length, okpct=tot?Math.round((n.bueno)/tot*100):0;
-  const detected=ms.filter(m=>m.grade>=3).length;
-  const acc=ms.filter(m=>m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0 && m.recomendacion.toUpperCase().indexOf('NO SE DETECTAN')<0 && m.grade>=3);
+  const active=ms.filter(m=>!m.nomedido);
+  const detected=active.filter(m=>m.grade>=3).length;
+  const acc=active.filter(m=>m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0 && m.recomendacion.toUpperCase().indexOf('NO SE DETECTAN')<0 && m.grade>=3);
   // bars from evo
   const labels=[]; ms.forEach(m=>(m.evo||[]).forEach(e=>{if(labels.indexOf(e.q)<0)labels.push(e.q);}));
   labels.sort((a,b)=>qNum(a)-qNum(b));
@@ -891,7 +893,7 @@ function bundle(ms,kind){
   const byfen=Object.keys(fc).sort((a,b)=>fc[b]-fc[a]).map(k=>({c:k,n:fc[k],col:(FENCOL[k]||DEFCOL[k]||'#1e6fb0')}));
   // watch grouped by area/family
   const groups={};
-  ms.filter(m=>m.grade>=3).forEach(m=>{const a=famOf(m,kind);(groups[a]=groups[a]||[]).push(m);});
+  active.filter(m=>m.grade>=3).forEach(m=>{const a=famOf(m,kind);(groups[a]=groups[a]||[]).push(m);});
   const watch=Object.keys(groups).map(a=>{const items=groups[a].sort((x,y)=>y.grade-x.grade).map(m=>({n:m.name,g:m.grade,s:m.state,id:m.id,r:m.recomendacion&&m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0?m.recomendacion:''}));
     const state=items.reduce((w,it)=>stOrder(it.s)>stOrder(w)?it.s:w,'bueno');return {area:a,state,items};}).sort((a,b)=>stOrder(b.state)-stOrder(a.state));
   // mejoras
@@ -907,9 +909,10 @@ function bundle(ms,kind){
   const _peak=m=>{let gs=((m.evo&&m.evo.length?m.evo:(m.trend||[])).map(x=>x.g).filter(g=>g!=null));gs.push(m.grade||0);return gs.length?Math.max.apply(null,gs):(m.grade||0);};
   const _aAver=ms.filter(m=>_peak(m)>=4).length, _aBuen=ms.filter(m=>_peak(m)<=2).length;
   const anual={tot,aver:_aAver,acc:_aAver,buen:_aBuen,okpct:tot?Math.round(_aBuen/tot*100):0};
-  const _uBuen=ms.filter(m=>(m.grade||0)<=2).length, _uAver=ms.filter(m=>(m.grade||0)>=4).length;
-  const _uAcc=ms.filter(m=>(m.grade||0)>=4 && m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0).length;
-  const ultima={tot,aver:_uAver,acc:_uAcc,buen:_uBuen,okpct:tot?Math.round(_uBuen/tot*100):0};
+  const _utot=active.length;
+  const _uBuen=active.filter(m=>(m.grade||0)<=2).length, _uAver=active.filter(m=>(m.grade||0)>=4).length;
+  const _uAcc=active.filter(m=>(m.grade||0)>=4 && m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0).length;
+  const ultima={tot:_utot,aver:_uAver,acc:_uAcc,buen:_uBuen,okpct:_utot?Math.round(_uBuen/_utot*100):0,nomedido:tot-_utot};
   return {n,tot,okpct,detected,acc,bars,byfen,watch,mejUltL,mejYearL,mejJumps,averiasDet,parosEvit,anual,ultima,ahorro:{total,risk,per,cTot,n:per.length}};
 }
 function techHead(title,sub){
@@ -1036,7 +1039,7 @@ function dashBlockEl(title,sub,B,ms,cid,pid){
   const causes=B.byfen.map(x=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${x.c}</span><b>${x.n}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${x.n/cmax*100}%;height:12px;border-radius:6px;background:${x.col}"></div></div></div>`).join("")||'<span style="color:var(--muted);font-size:12px">—</span>';
   const byArea={};ms.forEach(m=>{const a=famOf(m,title.indexOf('Vibraciones')>=0?'vib':'termo');(byArea[a]=byArea[a]||[]).push(m);});
   let matrix=`<table><thead><tr><th>Área</th><th>Pulsa una para su análisis detallado</th></tr></thead><tbody>`;
-  Object.keys(byArea).forEach(a=>{let cells=byArea[a].map(m=>`<span class="pill ${STATES[m.state].pill}" style="margin:2px 4px 2px 0;font-size:10.5px;cursor:pointer" onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${m.id}'})">${m.name} (${m.grade||'-'}) →</span>`).join("");matrix+=`<tr><td style="font-weight:600;white-space:nowrap">${a}</td><td>${cells}</td></tr>`;});
+  Object.keys(byArea).forEach(a=>{let cells=byArea[a].map(m=>`<span class="pill ${STATES[m.state].pill}" style="margin:2px 4px 2px 0;font-size:10.5px;cursor:pointer${m.nomedido?';opacity:.65':''}" onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${m.id}'})">${m.name} (${m.nomedido?'no medido':(m.grade||'-')}) →</span>`).join("");matrix+=`<tr><td style="font-weight:600;white-space:nowrap">${a}</td><td>${cells}</td></tr>`;});
   matrix+=`</tbody></table>`;
   const actions=B.acc.slice(0,12).map(m=>`<div onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${m.id}'})" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer"><div style="flex:none">${pill(m.state)}</div><div style="flex:1"><b style="font-size:13px">${m.name}</b><div style="font-size:12.5px;color:#3b4a58">${m.recomendacion} · grado ${m.grade}/10</div></div><span style="color:var(--steel);font-weight:700;align-self:center">→</span></div>`).join("")||'<div style="color:var(--muted)">Sin acciones.</div>';
   const rank=B.watch.slice(0,5).map((a,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)"><b style="color:var(--muted);width:18px">${i+1}</b><div style="flex:1"><b style="font-size:13px">${a.area}</b></div>${pill(a.state)}</div>`).join("")||'<div style="color:var(--muted)">—</div>';
@@ -1290,6 +1293,7 @@ function renderMachine(){
       <div><h1>${m.name}</h1><p class="sub">${p.name} · Área: ${m.area}</p></div>
       ${session.role==='admin'?`<button class="btn" onclick="editState('${m.id}','${m.name.replace(/'/g,"")}','${m.state}')">✎ Editar estado</button>`:''}
     </div>
+    ${m.nomedido?`<div class="card pad" style="margin:4px 0 0;background:#f1f3f5;border-left:4px solid #9aa5b1;color:#4a5560"><b style="color:#5a6673">⊘ No medido en la última inspección</b><div style="font-size:12.8px;margin-top:4px;line-height:1.6">Esta máquina no se midió en la última visita. Se muestra su <b>último diagnóstico disponible</b>; no entra en la comparativa ni en las estadísticas de esta inspección hasta que se vuelva a medir.</div></div>`:''}
     <div class="m-states">
       <div class="state-box"><small>Estado</small>${pill(m.state)}</div>
       <div class="state-box"><small>Severidad máxima</small><b>Grado ${m.grade}/10</b></div>
@@ -1585,6 +1589,7 @@ function savRisk(c){
   if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
   let annual=0,n=0,potential=0,npot=0; const visits={};
   scopedPlants(c).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
+    if(m.nomedido) return;
     var tr=(m.trend||[]).filter(function(t){return t.g!=null;});
     tr.forEach(function(t){visits[t.l]=1;});
     var now=(m.grade!=null?m.grade:(tr.length?tr[tr.length-1].g:0));
@@ -1762,7 +1767,7 @@ function renderDash(){
   const cmax=Math.max(...CAUSES.map(x=>x.n));
   let causes=CAUSES.map(x=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${x.c}</span><b>${x.n}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${x.n/cmax*100}%;height:12px;border-radius:6px;background:${x.col}"></div></div></div>`).join("");
   let matrix=`<table><thead><tr><th>Área</th><th>Máquinas · pulsa una para su análisis detallado</th></tr></thead><tbody>`;
-  p.areas.forEach(a=>{let cells=a.machines.map(m=>`<span class="pill ${STATES[m.state].pill}" style="margin:2px 4px 2px 0;font-size:10.5px;cursor:pointer" onclick="go({name:'machine',cid:'${view.cid||'elis'}',pid:'elis',mid:'${m.id}'})">${m.name} (${m.grade}) →</span>`).join("");matrix+=`<tr><td style="font-weight:600;white-space:nowrap">${a.name}</td><td>${cells}</td></tr>`;});
+  p.areas.forEach(a=>{let cells=a.machines.map(m=>`<span class="pill ${STATES[m.state].pill}" style="margin:2px 4px 2px 0;font-size:10.5px;cursor:pointer${m.nomedido?';opacity:.65':''}" onclick="go({name:'machine',cid:'${view.cid||'elis'}',pid:'elis',mid:'${m.id}'})">${m.name} (${m.nomedido?'no medido':m.grade}) →</span>`).join("");matrix+=`<tr><td style="font-weight:600;white-space:nowrap">${a.name}</td><td>${cells}</td></tr>`;});
   matrix+=`</tbody></table>`;
   const areaOfM=m=>{let an='';p.areas.forEach(ar=>{if(ar.machines.indexOf(m)>=0)an=ar.name;});return an;};
   const needing=ms.filter(m=>(m.grade||0)>=3).sort((x,y)=>(y.grade||0)-(x.grade||0));
