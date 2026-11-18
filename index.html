@@ -1301,13 +1301,15 @@ function renderMachine(){
   out+=`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Diagnóstico por fenómeno</b>
     <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Cada fenómeno vibratorio, con su estado, grado y la recomendación del analista.</p>
     <table><thead><tr><th>Fenómeno</th><th>Estado</th><th>Grado</th><th>Recomendación</th></tr></thead><tbody>`;
-  m.fens.forEach(e=>{out+=`<tr${act(e)?' style="background:#fff8f0"':''}><td style="font-weight:600">${e.f}</td><td style="font-size:12px;color:var(--muted)">${e.estado||''}</td><td>${(e.grado!==null&&e.grado!==undefined)?e.grado:'·'}</td><td style="font-size:12px">${act(e)?'<b>'+e.rec+'</b>':(e.rec||'—')}</td></tr>`;});
+  (m.fens||[]).forEach(e=>{out+=`<tr${act(e)?' style="background:#fff8f0"':''}><td style="font-weight:600">${e.f}</td><td style="font-size:12px;color:var(--muted)">${e.estado||''}</td><td>${(e.grado!==null&&e.grado!==undefined)?e.grado:'·'}</td><td style="font-size:12px">${act(e)?'<b>'+e.rec+'</b>':(e.rec||'—')}</td></tr>`;});
   out+=`</tbody></table>`;
   const _dn=developNote(m.note,m.rec);
   if(_dn) out+=`<div style="font-size:13px;color:#2b3845;margin-top:12px;background:#f3f7fb;border-left:4px solid var(--steel);border-radius:8px;padding:12px 14px;line-height:1.6"><b style="color:var(--navy)">Nota del analista</b><div style="margin-top:4px">${_dn}</div></div>`;
   out+=`</div>`;
   out+=`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Informe</b><p style="color:var(--muted);font-size:12px;margin:4px 0 8px">El informe completo en PDF, descargable.</p><div style="margin-top:4px">`;
-  m.reports.forEach(r=>out+=`<div class="rep"><div class="ic ${r.f==='xls'?'xls':''}">${r.f.toUpperCase()}</div><div class="meta"><b>${r.t}</b><span>${r.d}</span></div>${dlBtn()}</div>`);
+  const _reps=m.reports||[];
+  if(_reps.length) _reps.forEach(r=>out+=`<div class="rep"><div class="ic ${r.f==='xls'?'xls':''}">${r.f.toUpperCase()}</div><div class="meta"><b>${r.t}</b><span>${r.d}</span></div>${dlBtn()}</div>`);
+  else out+=`<div class="rep"><div class="ic">PDF</div><div class="meta"><b>Informe del cliente</b><span>Descarga en PDF</span></div>${dlBtn()}</div>`;
   out+=`</div></div></main>`;
   return out;
 }
