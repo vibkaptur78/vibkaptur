@@ -905,13 +905,15 @@ function bundle(ms,kind){
   let total=0,risk=0,per=[],cTot={parada:0,repuestos:0,mano:0,tnp:0};
   ms.forEach(m=>{const g=m.grade||0,pico=Math.max(g,...((m.evo||[]).map(x=>x.g)));const dP=Math.max(0,pOf(pico)-pOf(g));const e=dP*CF;if(e>0){total+=e;per.push({name:m.name,pico,g,eur:e});for(const k in comp)cTot[k]+=dP*comp[k];}if(g>=5)risk+=pOf(g)*CF;});
   per.sort((x,y)=>y.eur-x.eur);
-  // KPIs anual (por pico del año) vs última inspección (estado actual)
-  const _peak=m=>{let gs=((m.evo&&m.evo.length?m.evo:(m.trend||[])).map(x=>x.g).filter(g=>g!=null));gs.push(m.grade||0);return gs.length?Math.max.apply(null,gs):(m.grade||0);};
-  const _aAver=ms.filter(m=>_peak(m)>=4).length, _aBuen=ms.filter(m=>_peak(m)<=2).length;
-  const anual={tot,aver:_aAver,acc:_aAver,buen:_aBuen,okpct:tot?Math.round(_aBuen/tot*100):0};
+  // KPIs anual = suma de TODOS los análisis de todos los informes (cada punto de histórico cuenta)
+  let _aTot=0,_aBuen=0,_aAver=0,_aAcc=0;
+  ms.forEach(m=>{(m.trend||[]).forEach(t=>{if(t.g==null)return;_aTot++;if(t.g<=2)_aBuen++;if(t.g>=5)_aAver++;if(t.g>=4)_aAcc++;});});
+  const anual={tot:_aTot,aver:_aAver,acc:_aAcc,buen:_aBuen,okpct:_aTot?Math.round(_aBuen/_aTot*100):0};
+  // última inspección = solo las medidas esta vez; averías grado>=5; acciones = las que llevan recomendación
+  const _isRec=m=>m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0 && m.recomendacion.toUpperCase().indexOf('NO SE DETECTAN')<0;
   const _utot=active.length;
-  const _uBuen=active.filter(m=>(m.grade||0)<=2).length, _uAver=active.filter(m=>(m.grade||0)>=4).length;
-  const _uAcc=active.filter(m=>(m.grade||0)>=4 && m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0).length;
+  const _uBuen=active.filter(m=>(m.grade||0)<=2).length, _uAver=active.filter(m=>(m.grade||0)>=5).length;
+  const _uAcc=active.filter(_isRec).length;
   const ultima={tot:_utot,aver:_uAver,acc:_uAcc,buen:_uBuen,okpct:_utot?Math.round(_uBuen/_utot*100):0,nomedido:tot-_utot};
   return {n,tot,okpct,detected,acc,bars,byfen,watch,mejUltL,mejYearL,mejJumps,averiasDet,parosEvit,anual,ultima,ahorro:{total,risk,per,cTot,n:per.length}};
 }
@@ -943,12 +945,12 @@ function statsBlockEl(title,sub,B,cid,pid){
   const topBars=_allit.sort((a,b)=>b.g-a.g).slice(0,6).map(it=>`<div onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${it.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(it.g)};background:${gbg(it.g)};border-radius:7px;padding:3px 0">${it.g}</span><div style="flex:1"><b style="font-size:12.8px">${it.n}</b><div style="color:var(--muted);font-size:11.5px">${it.area}</div></div><span style="color:var(--steel);font-weight:700">→</span></div>`).join("")||'<span style="color:var(--muted);font-size:12px">Sin equipos en vigilancia.</span>';
   return `${techHead(title,sub)}
     <div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--steel);margin:2px 0 6px">ACUMULADO DEL AÑO</div>
-    <div class="kpi">${tile(B.anual.tot,'Máquinas analizadas (año)','var(--navy)')}${tile(B.anual.okpct+'%','En buen estado (año)','var(--g-bueno)')}${tile(B.anual.aver,'Averías detectadas ≥4 (año)','var(--g-alerta)')}${tile(B.anual.acc,'Acciones recomendadas (año)','var(--g-peligro)')}</div>
+    <div class="kpi">${tile(B.anual.tot,'Análisis realizados (año)','var(--navy)')}${tile(B.anual.okpct+'%','En buen estado (año)','var(--g-bueno)')}${tile(B.anual.aver,'Averías detectadas ≥5 (año)','var(--g-alerta)')}${tile(B.anual.acc,'Acciones recomendadas (año)','var(--g-peligro)')}</div>
     <div class="card pad" style="background:linear-gradient(90deg,#0d2d46,#15466b);color:#fff;margin-bottom:14px"><b style="font-size:15px;color:#fff">El trabajo de Ingenor — última inspección</b><p style="color:#cfe0ee;font-size:12px;margin:4px 0 12px">Estado en la última visita realizada a la planta.</p>
       <div class="kpi" style="margin:0">
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${B.ultima.tot}</b><small style="color:#cfe0ee">Máquinas medidas</small></div>
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">${B.ultima.okpct}%</b><small style="color:#cfe0ee">En buen estado</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ffd27e">${B.ultima.aver}</b><small style="color:#cfe0ee">Averías detectadas (≥4)</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ffd27e">${B.ultima.aver}</b><small style="color:#cfe0ee">Averías detectadas (≥5)</small></div>
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ff9e9e">${B.ultima.acc}</b><small style="color:#cfe0ee">Acciones recomendadas</small></div>
       </div></div>
     <div class="two-col"><div class="card pad"><b style="font-size:14px">Evolución del estado</b><p style="color:var(--muted);font-size:12px;margin:4px 0 2px">Máquinas por estado en cada inspección.</p><div class="bars">${bars}</div><div class="legend" style="margin-top:10px"><span><span class="dot d-bueno"></span>Bueno</span><span><span class="dot d-seg"></span>Seguim.</span><span><span class="dot d-alerta"></span>Atención</span><span><span class="dot d-peligro"></span>Peligro</span></div></div>
@@ -1480,13 +1482,14 @@ function renderStats(){
   const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||curClient||DATA.clients[0].id):session.clientId));
   const _EMS=[]; const _AM=[]; (_c?scopedPlants(_c):[]).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{_EMS.push({name:a.name+' · '+m.name,trend:m.trend,evo:m.evo});_AM.push(m);})));
   const MJ=calcMej(_EMS);
-  const _pk=m=>{let gs=((m.evo&&m.evo.length?m.evo:(m.trend||[])).map(x=>x.g).filter(g=>g!=null));gs.push(m.grade||0);return gs.length?Math.max.apply(null,gs):(m.grade||0);};
-  const _tot=_AM.length;
-  const _anual={tot:_tot,aver:_AM.filter(m=>_pk(m)>=4).length,buen:_AM.filter(m=>_pk(m)<=2).length};
-  _anual.acc=_anual.aver; _anual.okpct=_tot?Math.round(_anual.buen/_tot*100):0;
-  const _ult={tot:_tot,aver:_AM.filter(m=>(m.grade||0)>=4).length,buen:_AM.filter(m=>(m.grade||0)<=2).length};
-  _ult.acc=_AM.filter(m=>(m.grade||0)>=4 && m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0).length;
-  _ult.okpct=_tot?Math.round(_ult.buen/_tot*100):0;
+  const _AMa=_AM.filter(m=>!m.nomedido);
+  let _aT=0,_aB=0,_aA=0,_aC=0;
+  _AM.forEach(m=>{(m.trend||[]).forEach(t=>{if(t.g==null)return;_aT++;if(t.g<=2)_aB++;if(t.g>=5)_aA++;if(t.g>=4)_aC++;});});
+  const _anual={tot:_aT,aver:_aA,acc:_aC,buen:_aB,okpct:_aT?Math.round(_aB/_aT*100):0};
+  const _isRecE=m=>m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0 && m.recomendacion.toUpperCase().indexOf('NO SE DETECTAN')<0;
+  const _uT=_AMa.length;
+  const _ult={tot:_uT,aver:_AMa.filter(m=>(m.grade||0)>=5).length,buen:_AMa.filter(m=>(m.grade||0)<=2).length};
+  _ult.acc=_AMa.filter(_isRecE).length; _ult.okpct=_uT?Math.round(_ult.buen/_uT*100):0;
   const SV=savingsModel(_c);
   const POT=savPotential(_c);
   let parosEvit=0; _EMS.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});
@@ -1520,9 +1523,9 @@ function renderStats(){
     <div class="noprint" style="margin:2px 0 16px"><button class="btn" onclick="generarInforme()" style="background:var(--green)">📄 Generar informe de resultados (PDF)</button> <span style="color:var(--muted);font-size:12px;margin-left:6px">Resumen descargable de las mejoras conseguidas con el mantenimiento predictivo.</span></div>
     <div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--steel);margin:2px 0 6px">ACUMULADO DEL AÑO</div>
     <div class="kpi">
-      ${tile(_anual.tot,'Máquinas analizadas (año)','var(--navy)')}
+      ${tile(_anual.tot,'Análisis realizados (año)','var(--navy)')}
       ${tile(_anual.okpct+'%','En buen estado (año)','var(--g-bueno)')}
-      ${tile(_anual.aver,'Averías detectadas ≥4 (año)','var(--g-alerta)')}
+      ${tile(_anual.aver,'Averías detectadas ≥5 (año)','var(--g-alerta)')}
       ${tile(_anual.acc,'Acciones recomendadas (año)','var(--g-peligro)')}
     </div>
     <div class="card pad" style="background:linear-gradient(90deg,#0d2d46,#15466b);color:#fff;margin-bottom:14px">
@@ -1531,7 +1534,7 @@ function renderStats(){
       <div class="kpi" style="margin:0">
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${_ult.tot}</b><small style="color:#cfe0ee">Máquinas medidas</small></div>
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">${_ult.okpct}%</b><small style="color:#cfe0ee">En buen estado</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ffd27e">${_ult.aver}</b><small style="color:#cfe0ee">Averías detectadas (≥4)</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ffd27e">${_ult.aver}</b><small style="color:#cfe0ee">Averías detectadas (≥5)</small></div>
         <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ff9e9e">${_ult.acc}</b><small style="color:#cfe0ee">Acciones recomendadas</small></div>
       </div>
     </div>
