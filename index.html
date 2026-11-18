@@ -1470,19 +1470,19 @@ function renderStats(){
   const cmap={bueno:'#2f6f52',seg:'#2f6f52',alerta:'#e08a00',peligro:'#d23b3b'};
   const gcol=g=>g>=7?'#d23b3b':g>=5?'#e08a00':g>=3?'#b8860b':'#2f6f52';
   const gbg=g=>g>=7?'#fce8e8':g>=5?'#fff3dc':g>=3?'#fbf4de':'#e8f3ec';
-  // ESTADO ACTUAL — áreas a vigilar
-  let watch=(S.watch||[]).map(w=>{
-    const rows=w.items.map(it=>`<div onclick="go({name:'machine',cid:'elis',pid:'elis',mid:'${it.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer">
-        <span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(it.g)};background:${gbg(it.g)};border-radius:7px;padding:3px 0">${it.g}</span>
-        <div style="flex:1"><b style="font-size:12.8px">${it.n}</b>${it.r?`<div style="color:var(--muted);font-size:11.5px">${it.r}</div>`:''}</div>
-        <span style="color:var(--steel);font-weight:700">→</span></div>`).join("");
-    const amber=w.items.filter(x=>x.g>=5&&x.g<7).length, red=w.items.filter(x=>x.g>=7).length;
-    const flags=[red?`<span style="background:#fce8e8;color:#d23b3b;font-weight:700;font-size:10.5px;padding:2px 8px;border-radius:20px">${red} en peligro</span>`:'',amber?`<span style="background:#fff3dc;color:#b06f00;font-weight:700;font-size:10.5px;padding:2px 8px;border-radius:20px">${amber} en atención</span>`:''].filter(Boolean).join(" ");
-    return `<div class="card pad" style="border-left:4px solid ${cmap[w.state]}">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px"><b style="font-size:14px">${w.area}</b>${pill(w.state)}</div>
-      <div style="margin:2px 0 6px">${flags||'<span style="color:var(--muted);font-size:11.5px">En seguimiento</span>'}</div>
-      ${rows}</div>`;
-  }).join("");
+  // FALLOS POR ÁREA y EQUIPOS DE MAYOR SEVERIDAD (desde datos reales)
+  const _areaStats=[]; const _topMach=[];
+  (_c?scopedPlants(_c):[]).forEach(p=>p.areas.forEach(a=>{
+    const need=a.machines.filter(m=>(m.grade||0)>=3);
+    const maxg=a.machines.reduce((w,m)=>Math.max(w,m.grade||0),0);
+    if(need.length) _areaStats.push({area:a.name,n:need.length,maxg:maxg});
+    a.machines.forEach(m=>_topMach.push({m:m,area:a.name,pid:p.id}));
+  }));
+  _areaStats.sort((x,y)=>y.maxg-x.maxg||y.n-x.n);
+  const _amax=Math.max(1,..._areaStats.map(s=>s.n));
+  let areaBars=_areaStats.map(s=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${s.area}</span><b style="color:${gcol(s.maxg)}">${s.n} equipo${s.n>1?'s':''} · máx ${s.maxg}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${Math.max(6,s.n/_amax*100)}%;height:12px;border-radius:6px;background:${gcol(s.maxg)}"></div></div></div>`).join("")||'<span style="color:var(--muted);font-size:12px">Sin incidencias por área.</span>';
+  _topMach.sort((x,y)=>(y.m.grade||0)-(x.m.grade||0));
+  let topBars=_topMach.filter(o=>(o.m.grade||0)>=3).slice(0,6).map(o=>`<div onclick="go({name:'machine',cid:'${_c?_c.id:'elis'}',pid:'${o.pid}',mid:'${o.m.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(o.m.grade)};background:${gbg(o.m.grade)};border-radius:7px;padding:3px 0">${o.m.grade}</span><div style="flex:1"><b style="font-size:12.8px">${o.m.name}</b><div style="color:var(--muted);font-size:11.5px">${o.area}</div></div><span style="color:var(--steel);font-weight:700">→</span></div>`).join("")||'<span style="color:var(--muted);font-size:12px">Sin equipos en vigilancia.</span>';
   return `<main>
     <h1>Estadísticas — Planta ELIS</h1>
     <p class="sub">Seguimiento trimestral (feb · may · ago · nov 2026) · ${S.tot} máquinas monitorizadas.</p>
@@ -1513,9 +1513,14 @@ function renderStats(){
         <p style="color:var(--muted);font-size:12px;margin:4px 0 6px">Qué tipo de defecto genera más recomendaciones.</p>
         <div style="margin-top:4px">${fen}</div></div>
     </div>
-    <h2 style="font-size:17px;margin:22px 0 4px;color:var(--navy)">Estado actual — áreas a vigilar</h2>
-    <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">Máquinas por área con revisión y grado. En <b style="color:#b06f00">naranja</b> las de atención (5–6) y en <b style="color:#d23b3b">rojo</b> las de peligro (7–10). Pulsa una máquina para ver su análisis.</p>
-    <div class="grid3">${watch}</div>
+    <div class="two-col" style="margin-top:14px">
+      <div class="card pad"><b style="font-size:14px">Fallos detectados por área</b>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Nº de equipos con incidencia (grado ≥3) por área; el color indica la severidad máxima del área.</p>
+        <div style="margin-top:4px">${areaBars}</div></div>
+      <div class="card pad"><b style="font-size:14px">Equipos de mayor severidad</b>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Los equipos con grado más alto en la última inspección. Pulsa uno para ver su análisis.</p>
+        <div style="margin-top:4px">${topBars}</div></div>
+    </div>
     <h2 style="font-size:17px;margin:24px 0 4px;color:var(--navy)">Mejoras conseguidas</h2>
     ${MJ.jumps?`<p style="font-size:12.8px;color:#1f6f47;background:#e8f3ec;border-radius:8px;padding:8px 12px;margin:2px 0 10px"><b>${MJ.jumps}</b> máquina(s) han mejorado de color de severidad en el año (p. ej. de naranja a amarillo o verde).</p>`:''}
     <div class="two-col">
@@ -1577,15 +1582,19 @@ const SAV_ADV=[
 ];
 function savBlockHTML(c){
   var S=savRisk(c); if(!S) return '';
-  return '<div style="border:1px solid #e6ecf2;border-left:4px solid #2f6f52;border-radius:12px;padding:15px 18px;margin-top:16px;break-inside:avoid">'
-   +'<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:15px;color:#0d2d46">Ahorro estimado por el mantenimiento predictivo</b><span style="font-size:11px;color:#8a98a6">estimación según literatura de referencia · últimos 12 meses</span></div>'
-   +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 4px">'
-     +'<div style="background:#e8f3ec;border-radius:12px;padding:14px 20px"><div style="font-size:26px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro anual estimado</div></div>'
-     +'<div style="background:#e8f3ec;border-radius:12px;padding:14px 20px"><div style="font-size:26px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.perVisit)+'</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro medio por visita</div></div>'
+  return '<div style="border:1px solid #e6ecf2;border-radius:14px;padding:24px 20px;margin-top:18px;break-inside:avoid;background:#fafcfe">'
+   +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">Ahorro estimado por el mantenimiento predictivo</b>'
+     +'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · últimos 12 meses</div></div>'
+   +'<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px">'
+     +'<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro anual estimado</div></div>'
+     +'<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.perVisit)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro medio por visita</div></div>'
    +'</div>'
-   +'<p style="font-size:11px;color:#8a98a6;margin:6px 0 0">'+S.nCaught+' equipos con fallo detectado a tiempo y corregido (su severidad bajó desde el pico). Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada. Rangos basados en estudios publicados (DOE/PNNL, McKinsey, Deloitte).</p>'
-   +'<div style="margin-top:14px;border-top:1px dashed #e6ecf2;padding-top:12px"><b style="font-size:14px;color:#0d2d46">Más allá del ahorro económico: valor del mantenimiento predictivo</b>'
-     +'<ul style="margin:8px 0 0;padding-left:18px;font-size:12.5px;color:#334155;line-height:1.75">'+SAV_ADV.map(function(a){return '<li>'+a+'</li>';}).join('')+'</ul></div>'
+   +'<p style="font-size:13px;color:#56687a;text-align:center;max-width:660px;margin:10px auto 0;line-height:1.6">'+S.nCaught+' equipos con fallo detectado a tiempo y corregido. Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada.</p>'
+   +'<div style="margin-top:22px"><b style="font-size:17px;color:#0d2d46">Más allá del ahorro económico</b>'
+     +'<p style="font-size:13px;color:#8a98a6;margin:3px 0 12px">Lo que además se consigue al detectar estos fallos a tiempo:</p>'
+     +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:11px">'
+     +SAV_ADV.map(function(a){return '<div style="display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #e6ecf2;border-left:3px solid #2f6f52;border-radius:10px;padding:13px 15px;font-size:14px;color:#2b3845;line-height:1.5"><span style="color:#2f6f52;font-weight:800;flex:none;font-size:15px">✓</span><div>'+a+'</div></div>';}).join('')
+     +'</div></div>'
    +'</div>';
 }
 function savingsModel(c){
@@ -1719,8 +1728,9 @@ function renderDash(){
   let matrix=`<table><thead><tr><th>Área</th><th>Máquinas · pulsa una para su análisis detallado</th></tr></thead><tbody>`;
   p.areas.forEach(a=>{let cells=a.machines.map(m=>`<span class="pill ${STATES[m.state].pill}" style="margin:2px 4px 2px 0;font-size:10.5px;cursor:pointer" onclick="go({name:'machine',cid:'${view.cid||'elis'}',pid:'elis',mid:'${m.id}'})">${m.name} (${m.grade}) →</span>`).join("");matrix+=`<tr><td style="font-weight:600;white-space:nowrap">${a.name}</td><td>${cells}</td></tr>`;});
   matrix+=`</tbody></table>`;
-  const midOf=(area,el)=>{let id='';p.areas.forEach(ar=>ar.machines.forEach(mm=>{if(ar.name===area&&mm.name.toLowerCase()===el.toLowerCase())id=mm.id;}));return id;};
-  let actions=ACTIONS.map(a=>{const id=midOf(a.m,a.el);return `<div onclick="${id?`go({name:'machine',cid:'elis',pid:'elis',mid:'${id}'})`:''}" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);${id?'cursor:pointer':''}"><div style="flex:none">${pill(a.s)}</div><div style="flex:1"><b style="font-size:13px">${a.m}</b> · <span style="color:var(--muted)">${a.el}</span><div style="font-size:12.5px;color:#3b4a58">${a.r} · grado ${a.g}/10</div></div>${id?'<span style="color:var(--steel);font-weight:700;align-self:center">→</span>':''}</div>`;}).join("");
+  const areaOfM=m=>{let an='';p.areas.forEach(ar=>{if(ar.machines.indexOf(m)>=0)an=ar.name;});return an;};
+  const needing=ms.filter(m=>(m.grade||0)>=3).sort((x,y)=>(y.grade||0)-(x.grade||0));
+  let actions=needing.map(m=>`<div onclick="go({name:'machine',cid:'${c.id}',pid:'${p.id}',mid:'${m.id}'})" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer"><div style="flex:none">${pill(m.state)}</div><div style="flex:1"><b style="font-size:13px">${m.name}</b> · <span style="color:var(--muted)">${areaOfM(m)}</span><div style="font-size:12.5px;color:#3b4a58">${m.recomendacion||m.rec||'Requiere seguimiento'} · grado ${m.grade}/10</div></div><span style="color:var(--steel);font-weight:700;align-self:center">→</span></div>`).join("")||'<div style="color:var(--muted)">Sin acciones pendientes.</div>';
   const areaRanked=[...p.areas].map(a=>({name:a.name,state:a.machines.reduce((w,m)=>stOrder(m.state)>stOrder(w)?m.state:w,'bueno')})).sort((a,b)=>stOrder(b.state)-stOrder(a.state)).slice(0,5);
   let rank=areaRanked.map((a,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)"><b style="color:var(--muted);width:18px">${i+1}</b><div style="flex:1"><b style="font-size:13px">${a.name}</b></div>${pill(a.state)}</div>`).join("");
   let legend=LEGEND.map(l=>`<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px"><span class="pill ${STATES[l.s].pill}" style="min-width:96px;justify-content:center">${STATES[l.s].label}</span><b style="width:46px">${l.g}</b><span style="color:var(--muted)">${l.n}</span></div>`).join("");
@@ -1732,7 +1742,7 @@ function renderDash(){
       <div class="card k"><b>${nareas}</b><small>Áreas</small></div>
       <div class="card k"><b>${tot}</b><small>Máquinas analizadas</small></div>
       <div class="card k"><b style="color:var(--g-alerta)">${vigC}</b><small>En vigilancia (grado ≥3)</small></div>
-      <div class="card k"><b style="color:var(--g-peligro)">${ACTIONS.length}</b><small>Acciones recomendadas</small></div>
+      <div class="card k"><b style="color:var(--g-peligro)">${needing.length}</b><small>Acciones recomendadas</small></div>
     </div>
     <div class="two-col">
       <div class="card pad"><b style="font-size:14px">Reparto de máquinas por estado</b>
