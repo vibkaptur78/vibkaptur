@@ -883,7 +883,10 @@ function bundle(ms,kind){
   const bars=labels.slice(-6).map(q=>{const o={label:q,bueno:0,seg:0,alerta:0,peligro:0};ms.forEach(m=>{const e=(m.evo||[]).find(x=>x.q===q);if(e){o[stG(e.g)]++;}});return o;});
   // byfen
   const fc={};
-  if(kind==='vib'){ ms.forEach(m=>{const f=m.fen||{};Object.keys(f).forEach(k=>{if(f[k]>=3)fc[k]=(fc[k]||0)+1;});}); }
+  if(kind==='vib'){ ms.forEach(m=>{const f=m.fen||{};
+    if(Object.keys(f).length){ Object.keys(f).forEach(k=>{if(f[k]>=3)fc[k]=(fc[k]||0)+1;}); }
+    else { (m.fens||[]).forEach(x=>{ if((x.grado||0)>=3){ const k=String(x.f||'').split(' · ')[0].trim(); if(k) fc[k]=(fc[k]||0)+1; } }); }
+  }); }
   else { ms.forEach(m=>{const d=(m.defecto||'').toLowerCase();let k=(!d||d.indexOf('no se detectan')>=0)?'Sin anomalía':d.indexOf('moderado')>=0?'Calentamiento moderado':d.indexOf('leve')>=0?'Calentamiento leve':'Otros defectos';fc[k]=(fc[k]||0)+1;}); }
   const byfen=Object.keys(fc).sort((a,b)=>fc[b]-fc[a]).map(k=>({c:k,n:fc[k],col:(FENCOL[k]||DEFCOL[k]||'#1e6fb0')}));
   // watch grouped by area/family
@@ -920,13 +923,14 @@ function statsBlockEl(title,sub,B,cid,pid){
   const fen=B.byfen.map(x=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${x.c}</span><b>${x.n}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${x.n/fmax*100}%;height:12px;border-radius:6px;background:${x.col}"></div></div></div>`).join("")||'<span style="color:var(--muted);font-size:12px">—</span>';
   const _bc=['#2f6f52','#b8860b','#e08a00','#d23b3b'],_bbg=['#e8f3ec','#fbf4de','#fff3dc','#fce8e8'];
   const mejrow=r=>{const jp=((r.jump||0)>=1)?` <span style="font-size:10px;font-weight:700;color:${_bc[r.bTo]};background:${_bbg[r.bTo]};padding:1px 7px;border-radius:20px;margin-left:4px;white-space:nowrap">${bandName(r.bFrom)} → ${bandName(r.bTo)}</span>`:'';return `<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="color:var(--g-bueno);font-weight:800">↓</span><div style="flex:1"><b style="font-size:13px">${r.m}</b>${jp}</div><span style="font-size:12px;color:var(--muted)">grado ${r.de} → <b style="color:var(--g-bueno)">${r.a}</b></span></div>`;};
-  const ult=B.mejUltL.map(mejrow).join("")||`<div style="color:var(--muted);padding:8px 0">Sin descensos en esta inspección</div>`;
-  const year=B.mejYearL.map(mejrow).join("")||`<div style="color:var(--muted);padding:8px 0">—</div>`;
-  const watch=B.watch.map(w=>{const rows=w.items.map(it=>`<div onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${it.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(it.g)};background:${gbg(it.g)};border-radius:7px;padding:3px 0">${it.g}</span><div style="flex:1"><b style="font-size:12.8px">${it.n}</b>${it.r?`<div style="color:var(--muted);font-size:11.5px">${it.r}</div>`:''}</div><span style="color:var(--steel);font-weight:700">→</span></div>`).join("");
-    const amber=w.items.filter(x=>x.g>=5&&x.g<7).length,red=w.items.filter(x=>x.g>=7).length;
-    const flags=[red?`<span style="background:#fce8e8;color:#d23b3b;font-weight:700;font-size:10.5px;padding:2px 8px;border-radius:20px">${red} en peligro</span>`:'',amber?`<span style="background:#fff3dc;color:#b06f00;font-weight:700;font-size:10.5px;padding:2px 8px;border-radius:20px">${amber} en atención</span>`:''].filter(Boolean).join(" ");
-    return `<div class="card pad" style="border-left:4px solid ${cmap[w.state]}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px"><b style="font-size:14px">${w.area}</b>${pill(w.state)}</div><div style="margin:2px 0 6px">${flags||'<span style="color:var(--muted);font-size:11.5px">En seguimiento</span>'}</div>${rows}</div>`;}).join("")||'<div style="color:var(--muted)">Sin áreas a vigilar.</div>';
-  // (ahorro económico eliminado por indicación del cliente)
+  const _isT=title.indexOf('Termograf')>=0; const _unit=_isT?'cuadros':'máquinas';
+  const _okMej=_isT?'Sin calentamientos nuevos: los cuadros se mantienen conformes.':'Sin incidencias nuevas: el parque se mantiene estable.';
+  const ult=B.mejUltL.map(mejrow).join("")||`<div style="color:#1f6f47;padding:8px 0;font-size:12.8px">✓ ${_okMej}</div>`;
+  const year=B.mejYearL.map(mejrow).join("")||`<div style="color:#1f6f47;padding:8px 0;font-size:12.8px">✓ Estado estable y bajo control durante el periodo.</div>`;
+  const _allit=[]; B.watch.forEach(w=>w.items.forEach(it=>_allit.push(Object.assign({area:w.area},it))));
+  const _amax=Math.max(1,...B.watch.map(w=>w.items.length));
+  const areaBars=B.watch.map(w=>{const mx=w.items.reduce((a,it)=>Math.max(a,it.g),0);return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${w.area}</span><b style="color:${gcol(mx)}">${w.items.length} equipo${w.items.length>1?'s':''} · máx ${mx}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${Math.max(6,w.items.length/_amax*100)}%;height:12px;border-radius:6px;background:${gcol(mx)}"></div></div></div>`;}).join("")||'<span style="color:var(--muted);font-size:12px">Sin incidencias por área.</span>';
+  const topBars=_allit.sort((a,b)=>b.g-a.g).slice(0,6).map(it=>`<div onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${it.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(it.g)};background:${gbg(it.g)};border-radius:7px;padding:3px 0">${it.g}</span><div style="flex:1"><b style="font-size:12.8px">${it.n}</b><div style="color:var(--muted);font-size:11.5px">${it.area}</div></div><span style="color:var(--steel);font-weight:700">→</span></div>`).join("")||'<span style="color:var(--muted);font-size:12px">Sin equipos en vigilancia.</span>';
   return `${techHead(title,sub)}
     <div class="kpi">${tile(B.tot,'Máquinas analizadas','var(--navy)')}${tile(B.okpct+'%','En buen estado','var(--g-bueno)')}${tile(B.averiasDet,'Averías detectadas (grado ≥3)','var(--g-alerta)')}${tile(B.acc.length,'Acciones recomendadas','var(--g-peligro)')}</div>
     <div class="card pad" style="background:linear-gradient(90deg,#0d2d46,#15466b);color:#fff;margin-bottom:14px"><b style="font-size:15px;color:#fff">El trabajo de Ingenor en esta planta</b><p style="color:#cfe0ee;font-size:12px;margin:4px 0 12px">Resultado del mantenimiento predictivo: problemas detectados a tiempo y severidad reducida gracias al seguimiento.</p>
@@ -938,9 +942,16 @@ function statsBlockEl(title,sub,B,cid,pid){
       </div></div>
     <div class="two-col"><div class="card pad"><b style="font-size:14px">Evolución del estado</b><p style="color:var(--muted);font-size:12px;margin:4px 0 2px">Máquinas por estado en cada inspección.</p><div class="bars">${bars}</div><div class="legend" style="margin-top:10px"><span><span class="dot d-bueno"></span>Bueno</span><span><span class="dot d-seg"></span>Seguim.</span><span><span class="dot d-alerta"></span>Atención</span><span><span class="dot d-peligro"></span>Peligro</span></div></div>
       <div class="card pad"><b style="font-size:14px">Fallos por tipo (${title.indexOf('Vibraciones')>=0?'fenómeno':'defecto'})</b><p style="color:var(--muted);font-size:12px;margin:4px 0 6px">Qué tipo de defecto genera más recomendaciones.</p><div style="margin-top:4px">${fen}</div></div></div>
-    <h3 style="font-size:16px;margin:20px 0 4px;color:var(--navy)">Estado actual — áreas a vigilar</h3>
-    <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">En <b style="color:#b06f00">naranja</b> atención (5–6) y <b style="color:#d23b3b">rojo</b> peligro (7–10). Pulsa una máquina para su análisis.</p>
-    <div class="grid3">${watch}</div>
+    ${B.watch.length?`<div class="two-col" style="margin-top:14px">
+      <div class="card pad"><b style="font-size:14px">${_isT?'Cuadros con calentamiento por área':'Fallos detectados por área'}</b>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Nº de ${_unit} con incidencia (grado ≥3) por área; el color indica la severidad máxima.</p>
+        <div style="margin-top:4px">${areaBars}</div></div>
+      <div class="card pad"><b style="font-size:14px">${_isT?'Cuadros de mayor severidad':'Equipos de mayor severidad'}</b>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Los de grado más alto en la última inspección. Pulsa uno para ver su análisis.</p>
+        <div style="margin-top:4px">${topBars}</div></div>
+    </div>`:`<div class="card pad" style="margin-top:14px;border-left:4px solid #2f6f52;background:#f0f8f3">
+      <b style="font-size:14px;color:#1f6f47">${_isT?'✓ Todos los cuadros sin puntos calientes':'✓ Todas las máquinas en buen estado'}</b>
+      <p style="font-size:12.8px;color:#334155;margin:6px 0 0;line-height:1.6">${_isT?`Los <b>${B.tot}</b> cuadros revisados están conformes, sin calentamientos. Confirmar que no hay puntos calientes es parte del valor del mantenimiento predictivo: previene <b>incendios eléctricos</b>, disparos intempestivos y paradas no programadas.`:`Las <b>${B.tot}</b> máquinas están en buen estado y ninguna requiere vigilancia. Confirmarlo inspección tras inspección evita averías y paradas no previstas.`}</p></div>`}
     <h3 style="font-size:16px;margin:20px 0 4px;color:var(--navy)">Mejoras conseguidas</h3>
     ${B.mejJumps?`<p style="font-size:12.8px;color:#1f6f47;background:#e8f3ec;border-radius:8px;padding:8px 12px;margin:2px 0 10px"><b>${B.mejJumps}</b> máquina(s) han mejorado de color de severidad en el año (p. ej. de naranja a amarillo o verde).</p>`:''}
     <div class="two-col"><div class="card pad"><b style="font-size:14px">En la última inspección</b>${ult}</div><div class="card pad"><b style="font-size:14px">Acumuladas (año)</b>${year}</div></div>`;
@@ -1046,6 +1057,7 @@ function renderOtuaView(mode){
     if(vib.length){const B=bundle(vib,'vib');out+= mode==='stats'?statsBlockEl('Vibraciones','Análisis de vibraciones · '+p.name,B,c.id,p.id):dashBlockEl('Vibraciones','Análisis de vibraciones · '+p.name,B,vib,c.id,p.id);}
     if(ter.length){const B=bundle(ter,'termo');out+= mode==='stats'?statsBlockEl('Termografía','Termografía de cuadros · '+p.name,B,c.id,p.id):dashBlockEl('Termografía','Termografía de cuadros · '+p.name,B,ter,c.id,p.id);}
   });
+  if(mode==='stats') out+=savBlockHTML(c);
   out+=`</main>`; return out;
 }
 
@@ -1551,10 +1563,10 @@ function savTempImproved(m){var h=m.evo||[],r=[];h.forEach(function(x){if(x.t!=n
 function savY(x){return (x||'').indexOf('26')>=0;}
 /* ===== Modelo de ahorro por RIESGO EVITADO (aprobado): reduccion de prob. de fallo x coste, 12 meses ===== */
 const SAV_PF={0:0,1:0,2:0.03,3:0.08,4:0.15,5:0.30,6:0.45,7:0.65,8:0.80,9:0.90,10:0.95};
-const SAV_COST={elis:2750};
+const SAV_COST={elis:2750,_default:2750};
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
 function savRisk(c){
-  if(!c) return null; const cost=SAV_COST[c.id]; if(!cost) return null;
+  if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
   let annual=0,n=0; const visits={};
   scopedPlants(c).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
     var tr=(m.trend||[]).filter(function(t){return t.g!=null;});
