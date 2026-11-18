@@ -835,7 +835,7 @@ function renderVibDash(PL){
   let rows=worst.slice(0,8).map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="go({name:'machine',cid:'${view.cid}',pid:'${m.pid}',mid:'${m.id}'})"><div style="flex:1"><b style="font-size:13px">${m.name}</b> <span style="color:var(--muted);font-size:12px">· ${m.plant.replace('Planta ','')}</span></div><b style="color:${gradeCol(m.grade)}">Grado ${m.grade}</b>${pill(m.state)}<span style="color:var(--steel);font-weight:700">→</span></div>`).join("");
   return `<div style="margin:22px 0 10px;border-top:2px solid var(--line);padding-top:16px"><h2 style="font-size:17px;margin:0 0 2px">Vibraciones</h2><p style="color:var(--muted);font-size:12.5px;margin:0">Severidad de las máquinas por vibraciones.</p></div>
     <div class="two-col">
-      <div class="card pad"><b style="font-size:14px">Reparto de máquinas por estado</b>
+      <div class="card pad"><b style="font-size:14px">Reparto de equipos por estado</b>
         <div style="display:flex;gap:18px;align-items:center;margin-top:12px">${donut}
           <div style="font-size:13px;line-height:1.9"><div><span class="dot d-bueno"></span>Bueno · ${cnt('bueno')}</div><div><span class="dot d-seg"></span>Seguimiento · ${cnt('seg')}</div><div><span class="dot d-alerta"></span>Atención · ${cnt('alerta')}</div><div><span class="dot d-peligro"></span>Peligro · ${cnt('peligro')}</div></div></div></div>
       <div class="card pad"><b style="font-size:14px">Máquinas a vigilar</b><div style="margin-top:8px">${rows}</div></div>
@@ -1777,7 +1777,7 @@ function renderDash(){
   const nareas=p.areas.length; const vigC=ms.filter(m=>m.grade>=3).length;
   const seg=[["#1f9d55",n.bueno],["#9acd32",n.seg],["#f0a500",n.alerta],["#dc3545",n.peligro],["#8a97a4",n.mant]];
   let acc=0,stops=[];seg.forEach(([col,v])=>{const a=acc/tot*360,b=(acc+v)/tot*360;if(v)stops.push(`${col} ${a}deg ${b}deg`);acc+=v;});
-  const donut=`<div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(${stops.join(",")});position:relative;flex:none"><div style="position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center"><b style="font-size:26px;line-height:1">${tot}</b><small style="color:var(--muted)">máquinas</small></div></div>`;
+  const donut=`<div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(${stops.join(",")});position:relative;flex:none"><div style="position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center"><b style="font-size:26px;line-height:1">${tot}</b><small style="color:var(--muted)">equipos</small></div></div>`;
   const cmax=Math.max(...CAUSES.map(x=>x.n));
   let causes=CAUSES.map(x=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${x.c}</span><b>${x.n}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${x.n/cmax*100}%;height:12px;border-radius:6px;background:${x.col}"></div></div></div>`).join("");
   let matrix=`<table><thead><tr><th>Área</th><th>Máquinas · pulsa una para su análisis detallado</th></tr></thead><tbody>`;
@@ -1791,11 +1791,11 @@ function renderDash(){
   let legend=LEGEND.map(l=>`<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px"><span class="pill ${STATES[l.s].pill}" style="min-width:96px;justify-content:center">${STATES[l.s].label}</span><b style="width:46px">${l.g}</b><span style="color:var(--muted)">${l.n}</span></div>`).join("");
   return `<main>
     <h1>Análisis — ${p.name}</h1>
-    <p class="sub">Todo lo de las fichas, cruzado: ${tot} máquinas en ${nareas} áreas, grado VIB-KAPTUR (1–10), causas y evolución.</p>
+    <p class="sub">Todo lo de las fichas, cruzado: ${tot} equipos en ${nareas} áreas, grado VIB-KAPTUR (1–10), causas y evolución.</p>
     ${session.role==='admin'?adminBanner("Esta vista se alimenta sola de las fichas y del informe. El cliente ve la de su planta."):''}
     <div class="kpi">
       <div class="card k"><b>${nareas}</b><small>Áreas</small></div>
-      <div class="card k"><b>${tot}</b><small>Máquinas analizadas</small></div>
+      <div class="card k"><b>${tot}</b><small>Equipos</small></div>
       <div class="card k"><b style="color:var(--g-alerta)">${vigC}</b><small>En vigilancia (grado ≥3)</small></div>
       <div class="card k"><b style="color:var(--g-peligro)">${needing.length}</b><small>Acciones recomendadas</small></div>
     </div>
