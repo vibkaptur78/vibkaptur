@@ -1287,16 +1287,17 @@ function renderMachine(){
         ${sevChart||'<span style="color:var(--muted);font-size:12.5px">Sin histórico suficiente.</span>'}</div>
       ${showRms?`<div class="card pad"><b style="font-size:14px">Valor vibratorio más alto (RMS)</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Evolución del valor global RMS más alto de la máquina, en mm/s.</p>
-        ${rmsChart(m.rms)}</div>`:`<div class="card pad" style="background:#f8fafc"><b style="font-size:14px">Foco del problema</b>
-        <p style="color:var(--muted);font-size:12px;margin:6px 0 0">${m.hasValues&&m.maxrms!=null?`Vibración más alta: <b>${String(m.maxrms).replace('.',',')} mm/s</b> en <b>${m.focuspt}</b>.`:'Esta ficha no incluye valores globales RMS.'}</p>
-        ${comps.length>1?`<p style="color:var(--muted);font-size:12px;margin:8px 0 0">Severidad: ${comps.map(c=>`<b>${c.name}</b> grado ${c.maxgrade} (${c.driver})`).join(' · ')}.</p>`:''}</div>`}
+        ${rmsChart(m.rms)}</div>`:`<div class="card pad"><b style="font-size:14px">Severidad por fenómeno</b>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Grado (1–10) de cada fenómeno vibratorio analizado. El grado de la máquina es el mayor de todos.</p>
+        ${(m.fens||[]).filter(e=>e.grado!=null).sort((a,b)=>b.grado-a.grado).map(e=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${e.f}</span><b style="color:${gradeCol(e.grado)}">${e.grado}/10</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${Math.max(6,e.grado/10*100)}%;height:12px;border-radius:6px;background:${gradeCol(e.grado)}"></div></div></div>`).join('')||'<span style="color:var(--muted);font-size:12.5px">Sin fenómenos registrados.</span>'}</div>`}
     </div>`;
     out+=`<p style="font-size:11.5px;color:var(--muted);font-style:italic;margin:9px 2px 0;line-height:1.6">Nota: el <b>grado de severidad</b> prevalece sobre el valor de vibración RMS. Se apoya en técnicas de análisis más complejas que el propio valor global (envolvente de rodamientos, ultrasonidos, espectro, fase…), que pueden elevar el grado aunque el RMS sea bajo.</p>`;
     out+=`<div class="card pad" style="margin-top:12px;background:#f7fafc;border-left:4px solid var(--steel)">
       <b style="font-size:13.5px">Foco del problema</b>
       <div style="font-size:12.8px;margin-top:5px;line-height:1.7">
         ${comps.length?`<div><b>Severidad máxima:</b> ${comps.map(c=>`${c.name} grado ${c.maxgrade} (${c.driver})`).join(' · ')}.</div>`:''}
-        ${m.hasValues&&m.maxrms!=null?`<div><b>Vibración más alta:</b> ${String(m.maxrms).replace('.',',')} mm/s en <b>${m.focuspt}</b>.</div>`:'<div style="color:var(--muted)">Esta ficha no incluye valores globales RMS.</div>'}
+        ${m.hasValues&&m.maxrms!=null?`<div><b>Vibración más alta:</b> ${String(m.maxrms).replace('.',',')} mm/s en <b>${m.focuspt}</b>.</div>`:''}
+        ${(!comps.length&&!(m.hasValues&&m.maxrms!=null))?(function(){var tf=(m.fens||[]).filter(e=>e.grado!=null).sort((a,b)=>b.grado-a.grado)[0];return tf?`<div><b>Fenómeno predominante:</b> ${tf.f} · grado ${tf.grado}/10${tf.rec&&tf.rec.toUpperCase().indexOf('NO REQUIERE')<0?` — ${tf.rec}`:''}.</div>`:'';})():''}
       </div></div>`;
   }
   out+=`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Diagnóstico por fenómeno</b>
