@@ -1904,8 +1904,8 @@ function render(){
       case "upload":body=renderUpload();break;
       case "users":body=renderUsers();break;
       case "tecnicas":body=renderTecnicas();break;
-      case "dash":{const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));body=(_c&&_c.plants&&_c.plants.some(p=>p.areas.some(a=>a.machines.some(m=>m.vib||m.tmax!==undefined))) && _c.id!=='elis')?renderOtuaView('dash'):renderDash();break;}
-      case "stats":{const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));body=(_c&&_c.id!=='elis'&&_c.plants&&_c.plants.some(p=>p.areas.some(a=>a.machines.some(m=>m.vib||m.tmax!==undefined))))?renderOtuaView('stats'):renderStats();break;}
+      case "dash":{const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));body=(_c&&_c.plants&&_c.plants.length&&_c.id!=='elis')?renderOtuaView('dash'):renderDash();break;}
+      case "stats":{const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||DATA.clients[0].id):session.clientId));body=(_c&&_c.plants&&_c.plants.length&&_c.id!=='elis')?renderOtuaView('stats'):renderStats();break;}
       default:body=renderPlants();
     }
   }catch(e){
