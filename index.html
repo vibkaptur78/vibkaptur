@@ -999,6 +999,7 @@ function generarInforme(){
       </div>
       <div style="font-weight:800;font-size:15px;color:#0d2d46;margin-bottom:10px">Detalle por planta y técnica</div>
       ${bloquesHTML}
+      ${savBlockHTML(c)}
       <div style="font-weight:800;font-size:15px;color:#0d2d46;margin:6px 0 8px">Conclusión</div>
       <p style="font-size:12.8px;color:#334155;line-height:1.7;margin:0 0 20px">${concl}</p>
       <div style="border-top:1px solid #e6ecf2;padding-top:12px;font-size:11px;color:#8a98a6;display:flex;justify-content:space-between">
@@ -1525,20 +1526,7 @@ function renderStats(){
         <p style="color:var(--muted);font-size:12px;margin:4px 0 6px">Puntos que han bajado de grado respecto al inicio del año.</p>
         ${year}</div>
     </div>
-    <div class="card pad" style="border-left:4px solid var(--g-bueno);margin-top:16px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
-        <b style="font-size:15px">Ahorro económico estimado</b>
-        <span style="font-size:11px;color:var(--muted)">estimación según literatura de referencia · resultados anuales</span>
-      </div>
-      <div style="background:#e8f3ec;border-radius:12px;padding:14px 20px;display:inline-block;margin:6px 0 4px"><div style="font-size:26px;font-weight:800;color:var(--g-bueno);line-height:1">${eur(SV.yr)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro realizado · acumulado 2026</div></div>
-      <p style="font-size:11px;color:var(--muted);margin:6px 0 0">Averías detectadas a tiempo y <b>ya corregidas</b> (han bajado de grado), evitando la parada. Suma de todas las bajadas del año.</p>
-      ${POT.items.length?`<div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:12px">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:14px;color:#b45309">⚠ Fallos potenciales detectados</b><span style="font-size:12px;color:#92400e">${POT.items.length} equipos · potencial ${eur(POT.total)}</span></div>
-        <p style="font-size:11.5px;color:var(--muted);margin:4px 0 8px">Detectados a tiempo pero <b>aún por corregir</b>: todavía no cuentan como ahorro realizado, pero al actuar se <b>evita la parada y el fallo catastrófico</b>.</p>
-        ${POT.items.slice(0,8).map(it=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f1f1f1;font-size:12.5px"><div><span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:10px">Grado ${it.grade}</span> ${it.name}</div><div style="color:#334;white-space:nowrap">potencial <b>${eur(it.val)}</b></div></div>`).join('')}
-      </div>`:''}
-      <p style="font-size:11px;color:var(--muted);margin:12px 0 0">Método: a cada bajada de grado (realizado) y a cada fallo potencial detectado (pendiente) se le asigna probabilidad de fallo × sobrecoste de una parada no planificada por clase de equipo. Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
-    </div>
+    ${savBlockHTML(_c)}
   </main>`;
 }
 /* ===== Modelo de ahorro económico estimado (estimación Ingenor, conservadora) ===== */
@@ -1556,6 +1544,50 @@ function savHistG(m){var h=m.trend||m.evo||[],r=[];h.forEach(function(x){if(x.g!
 function savImproved(m){var g=savHistG(m);return g.length>=2&&g[g.length-1]<g[g.length-2];}
 function savTempImproved(m){var h=m.evo||[],r=[];h.forEach(function(x){if(x.t!=null)r.push(x.t);});return r.length>=2&&r[r.length-1]<r[r.length-2];}
 function savY(x){return (x||'').indexOf('26')>=0;}
+/* ===== Modelo de ahorro por RIESGO EVITADO (aprobado): reduccion de prob. de fallo x coste, 12 meses ===== */
+const SAV_PF={0:0,1:0,2:0.03,3:0.08,4:0.15,5:0.30,6:0.45,7:0.65,8:0.80,9:0.90,10:0.95};
+const SAV_COST={elis:2750};
+function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
+function savRisk(c){
+  if(!c) return null; const cost=SAV_COST[c.id]; if(!cost) return null;
+  let annual=0,n=0; const visits={};
+  scopedPlants(c).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
+    var tr=(m.trend||[]).filter(function(t){return t.g!=null;});
+    tr.forEach(function(t){visits[t.l]=1;});
+    if(tr.length<2) return;
+    var gs=tr.map(function(t){return t.g;}),peak=Math.max.apply(null,gs),now=gs[gs.length-1];
+    if(peak>now){annual+=(savPf(peak)-savPf(now))*cost;n++;}
+  });});});
+  var nv=Object.keys(visits).length||1;
+  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),nVisits:nv,nCaught:n,cost:cost};
+}
+const SAV_ADV=[
+ "<b>Seguridad del personal</b> — evita roturas con proyección de piezas, sobrecalentamientos e incendios cerca de los operarios.",
+ "<b>Evita fallos catastróficos</b> y daños a equipos acoplados (ejes, acoplamientos, bancadas).",
+ "<b>Frena la degradación</b>: un defecto leve no progresa a daño mayor (rodamiento → eje → motor completo).",
+ "<b>Elimina fallos intempestivos</b> y paradas imprevistas en plena producción.",
+ "<b>Menos horas extra y urgencias</b>: se repara en horario normal, no de noche ni en fin de semana.",
+ "<b>Cumplimiento de entregas</b>: evita retrasos en pedidos por paradas no programadas.",
+ "<b>Planificación de repuestos</b>: da tiempo a tener la pieza, sin sobrecostes de envío exprés.",
+ "<b>Mayor vida útil</b> de motores, bombas y turbinas al intervenir a tiempo.",
+ "<b>Ahorro energético</b>: corregir desequilibrios y desalineaciones reduce el consumo del motor.",
+ "<b>Mejor calidad de producto</b>: menos vibración, mejor acabado y menos rechazos.",
+ "<b>Menor impacto ambiental</b>: evita fugas, vertidos y consumo innecesario.",
+ "<b>Trazabilidad</b>: el histórico respalda decisiones de mantenimiento e inversión."
+];
+function savBlockHTML(c){
+  var S=savRisk(c); if(!S) return '';
+  return '<div style="border:1px solid #e6ecf2;border-left:4px solid #2f6f52;border-radius:12px;padding:15px 18px;margin-top:16px;break-inside:avoid">'
+   +'<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:15px;color:#0d2d46">Ahorro estimado por el mantenimiento predictivo</b><span style="font-size:11px;color:#8a98a6">estimación según literatura de referencia · últimos 12 meses</span></div>'
+   +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 4px">'
+     +'<div style="background:#e8f3ec;border-radius:12px;padding:14px 20px"><div style="font-size:26px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro anual estimado</div></div>'
+     +'<div style="background:#e8f3ec;border-radius:12px;padding:14px 20px"><div style="font-size:26px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.perVisit)+'</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro medio por visita</div></div>'
+   +'</div>'
+   +'<p style="font-size:11px;color:#8a98a6;margin:6px 0 0">'+S.nCaught+' equipos con fallo detectado a tiempo y corregido (su severidad bajó desde el pico). Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada. Rangos basados en estudios publicados (DOE/PNNL, McKinsey, Deloitte).</p>'
+   +'<div style="margin-top:14px;border-top:1px dashed #e6ecf2;padding-top:12px"><b style="font-size:14px;color:#0d2d46">Más allá del ahorro económico: valor del mantenimiento predictivo</b>'
+     +'<ul style="margin:8px 0 0;padding-left:18px;font-size:12.5px;color:#334155;line-height:1.75">'+SAV_ADV.map(function(a){return '<li>'+a+'</li>';}).join('')+'</ul></div>'
+   +'</div>';
+}
 function savingsModel(c){
   // Solo se cuenta el ahorro cuando un equipo HA BAJADO de grado (problema corregido), una vez por bajada.
   let cur=0,yr=0;
