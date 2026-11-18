@@ -903,7 +903,14 @@ function bundle(ms,kind){
   let total=0,risk=0,per=[],cTot={parada:0,repuestos:0,mano:0,tnp:0};
   ms.forEach(m=>{const g=m.grade||0,pico=Math.max(g,...((m.evo||[]).map(x=>x.g)));const dP=Math.max(0,pOf(pico)-pOf(g));const e=dP*CF;if(e>0){total+=e;per.push({name:m.name,pico,g,eur:e});for(const k in comp)cTot[k]+=dP*comp[k];}if(g>=5)risk+=pOf(g)*CF;});
   per.sort((x,y)=>y.eur-x.eur);
-  return {n,tot,okpct,detected,acc,bars,byfen,watch,mejUltL,mejYearL,mejJumps,averiasDet,parosEvit,ahorro:{total,risk,per,cTot,n:per.length}};
+  // KPIs anual (por pico del año) vs última inspección (estado actual)
+  const _peak=m=>{let gs=((m.evo&&m.evo.length?m.evo:(m.trend||[])).map(x=>x.g).filter(g=>g!=null));gs.push(m.grade||0);return gs.length?Math.max.apply(null,gs):(m.grade||0);};
+  const _aAver=ms.filter(m=>_peak(m)>=4).length, _aBuen=ms.filter(m=>_peak(m)<=2).length;
+  const anual={tot,aver:_aAver,acc:_aAver,buen:_aBuen,okpct:tot?Math.round(_aBuen/tot*100):0};
+  const _uBuen=ms.filter(m=>(m.grade||0)<=2).length, _uAver=ms.filter(m=>(m.grade||0)>=4).length;
+  const _uAcc=ms.filter(m=>(m.grade||0)>=4 && m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0).length;
+  const ultima={tot,aver:_uAver,acc:_uAcc,buen:_uBuen,okpct:tot?Math.round(_uBuen/tot*100):0};
+  return {n,tot,okpct,detected,acc,bars,byfen,watch,mejUltL,mejYearL,mejJumps,averiasDet,parosEvit,anual,ultima,ahorro:{total,risk,per,cTot,n:per.length}};
 }
 function techHead(title,sub){
   const isV=title.indexOf('Vibraciones')>=0, isT=title.indexOf('Termograf')>=0;
@@ -932,13 +939,14 @@ function statsBlockEl(title,sub,B,cid,pid){
   const areaBars=B.watch.map(w=>{const mx=w.items.reduce((a,it)=>Math.max(a,it.g),0);return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${w.area}</span><b style="color:${gcol(mx)}">${w.items.length} equipo${w.items.length>1?'s':''} · máx ${mx}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${Math.max(6,w.items.length/_amax*100)}%;height:12px;border-radius:6px;background:${gcol(mx)}"></div></div></div>`;}).join("")||'<span style="color:var(--muted);font-size:12px">Sin incidencias por área.</span>';
   const topBars=_allit.sort((a,b)=>b.g-a.g).slice(0,6).map(it=>`<div onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${it.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(it.g)};background:${gbg(it.g)};border-radius:7px;padding:3px 0">${it.g}</span><div style="flex:1"><b style="font-size:12.8px">${it.n}</b><div style="color:var(--muted);font-size:11.5px">${it.area}</div></div><span style="color:var(--steel);font-weight:700">→</span></div>`).join("")||'<span style="color:var(--muted);font-size:12px">Sin equipos en vigilancia.</span>';
   return `${techHead(title,sub)}
-    <div class="kpi">${tile(B.tot,'Máquinas analizadas','var(--navy)')}${tile(B.okpct+'%','En buen estado','var(--g-bueno)')}${tile(B.averiasDet,'Averías detectadas (grado ≥3)','var(--g-alerta)')}${tile(B.acc.length,'Acciones recomendadas','var(--g-peligro)')}</div>
-    <div class="card pad" style="background:linear-gradient(90deg,#0d2d46,#15466b);color:#fff;margin-bottom:14px"><b style="font-size:15px;color:#fff">El trabajo de Ingenor en esta planta</b><p style="color:#cfe0ee;font-size:12px;margin:4px 0 12px">Resultado del mantenimiento predictivo: problemas detectados a tiempo y severidad reducida gracias al seguimiento.</p>
+    <div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--steel);margin:2px 0 6px">ACUMULADO DEL AÑO</div>
+    <div class="kpi">${tile(B.anual.tot,'Máquinas analizadas (año)','var(--navy)')}${tile(B.anual.okpct+'%','En buen estado (año)','var(--g-bueno)')}${tile(B.anual.aver,'Averías detectadas ≥4 (año)','var(--g-alerta)')}${tile(B.anual.acc,'Acciones recomendadas (año)','var(--g-peligro)')}</div>
+    <div class="card pad" style="background:linear-gradient(90deg,#0d2d46,#15466b);color:#fff;margin-bottom:14px"><b style="font-size:15px;color:#fff">El trabajo de Ingenor — última inspección</b><p style="color:#cfe0ee;font-size:12px;margin:4px 0 12px">Estado en la última visita realizada a la planta.</p>
       <div class="kpi" style="margin:0">
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">↓ ${B.mejYearL.length}</b><small style="color:#cfe0ee">Máquinas que han bajado su severidad</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${B.parosEvit}</b><small style="color:#cfe0ee">Paros no programados evitados</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${B.averiasDet}</b><small style="color:#cfe0ee">Averías detectadas a tiempo</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">↓ ${B.mejUltL.length}</b><small style="color:#cfe0ee">Han bajado en la última inspección</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${B.ultima.tot}</b><small style="color:#cfe0ee">Máquinas medidas</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">${B.ultima.okpct}%</b><small style="color:#cfe0ee">En buen estado</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ffd27e">${B.ultima.aver}</b><small style="color:#cfe0ee">Averías detectadas (≥4)</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ff9e9e">${B.ultima.acc}</b><small style="color:#cfe0ee">Acciones recomendadas</small></div>
       </div></div>
     <div class="two-col"><div class="card pad"><b style="font-size:14px">Evolución del estado</b><p style="color:var(--muted);font-size:12px;margin:4px 0 2px">Máquinas por estado en cada inspección.</p><div class="bars">${bars}</div><div class="legend" style="margin-top:10px"><span><span class="dot d-bueno"></span>Bueno</span><span><span class="dot d-seg"></span>Seguim.</span><span><span class="dot d-alerta"></span>Atención</span><span><span class="dot d-peligro"></span>Peligro</span></div></div>
       <div class="card pad"><b style="font-size:14px">Fallos por tipo (${title.indexOf('Vibraciones')>=0?'fenómeno':'defecto'})</b><p style="color:var(--muted);font-size:12px;margin:4px 0 6px">Qué tipo de defecto genera más recomendaciones.</p><div style="margin-top:4px">${fen}</div></div></div>
@@ -1466,8 +1474,15 @@ function renderStats(){
   const S=STATS2;
   // mejoras computed dynamically (same rule as every client): acumulado = bajadas en las 4 últimas medidas (pico→actual)
   const _c=DATA.clients.find(x=>x.id===(staff()?(view.cid||curClient||DATA.clients[0].id):session.clientId));
-  const _EMS=[]; (_c?scopedPlants(_c):[]).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>_EMS.push({name:a.name+' · '+m.name,trend:m.trend,evo:m.evo}))));
+  const _EMS=[]; const _AM=[]; (_c?scopedPlants(_c):[]).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{_EMS.push({name:a.name+' · '+m.name,trend:m.trend,evo:m.evo});_AM.push(m);})));
   const MJ=calcMej(_EMS);
+  const _pk=m=>{let gs=((m.evo&&m.evo.length?m.evo:(m.trend||[])).map(x=>x.g).filter(g=>g!=null));gs.push(m.grade||0);return gs.length?Math.max.apply(null,gs):(m.grade||0);};
+  const _tot=_AM.length;
+  const _anual={tot:_tot,aver:_AM.filter(m=>_pk(m)>=4).length,buen:_AM.filter(m=>_pk(m)<=2).length};
+  _anual.acc=_anual.aver; _anual.okpct=_tot?Math.round(_anual.buen/_tot*100):0;
+  const _ult={tot:_tot,aver:_AM.filter(m=>(m.grade||0)>=4).length,buen:_AM.filter(m=>(m.grade||0)<=2).length};
+  _ult.acc=_AM.filter(m=>(m.grade||0)>=4 && m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0).length;
+  _ult.okpct=_tot?Math.round(_ult.buen/_tot*100):0;
   const SV=savingsModel(_c);
   const POT=savPotential(_c);
   let parosEvit=0; _EMS.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});
@@ -1499,20 +1514,21 @@ function renderStats(){
     <h1>Estadísticas — Planta ELIS</h1>
     <p class="sub">Seguimiento trimestral (feb · may · ago · nov 2026) · ${S.tot} máquinas monitorizadas.</p>
     <div class="noprint" style="margin:2px 0 16px"><button class="btn" onclick="generarInforme()" style="background:var(--green)">📄 Generar informe de resultados (PDF)</button> <span style="color:var(--muted);font-size:12px;margin-left:6px">Resumen descargable de las mejoras conseguidas con el mantenimiento predictivo.</span></div>
+    <div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--steel);margin:2px 0 6px">ACUMULADO DEL AÑO</div>
     <div class="kpi">
-      ${tile(S.tot,'Máquinas analizadas','var(--navy)')}
-      ${tile(S.okpct+'%','En buen estado','var(--g-bueno)')}
-      ${tile(S.detected,'Averías detectadas (grado ≥3)','var(--g-alerta)')}
-      ${tile(ACTIONS.length,'Acciones recomendadas','var(--g-peligro)')}
+      ${tile(_anual.tot,'Máquinas analizadas (año)','var(--navy)')}
+      ${tile(_anual.okpct+'%','En buen estado (año)','var(--g-bueno)')}
+      ${tile(_anual.aver,'Averías detectadas ≥4 (año)','var(--g-alerta)')}
+      ${tile(_anual.acc,'Acciones recomendadas (año)','var(--g-peligro)')}
     </div>
     <div class="card pad" style="background:linear-gradient(90deg,#0d2d46,#15466b);color:#fff;margin-bottom:14px">
-      <b style="font-size:15px;color:#fff">El trabajo de Ingenor en esta planta</b>
-      <p style="color:#cfe0ee;font-size:12px;margin:4px 0 12px">Resultado del mantenimiento predictivo: problemas detectados a tiempo y severidad reducida gracias al seguimiento.</p>
+      <b style="font-size:15px;color:#fff">El trabajo de Ingenor — última inspección</b>
+      <p style="color:#cfe0ee;font-size:12px;margin:4px 0 12px">Estado en la última visita realizada a la planta.</p>
       <div class="kpi" style="margin:0">
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">↓ ${MJ.year.length}</b><small style="color:#cfe0ee">Máquinas que han bajado su severidad</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${parosEvit}</b><small style="color:#cfe0ee">Paros no programados evitados</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${S.detected}</b><small style="color:#cfe0ee">Averías detectadas a tiempo</small></div>
-        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">↓ ${MJ.ult.length}</b><small style="color:#cfe0ee">Han bajado en la última inspección</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#fff">${_ult.tot}</b><small style="color:#cfe0ee">Máquinas medidas</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#7ee0a6">${_ult.okpct}%</b><small style="color:#cfe0ee">En buen estado</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ffd27e">${_ult.aver}</b><small style="color:#cfe0ee">Averías detectadas (≥4)</small></div>
+        <div class="card k" style="background:rgba(255,255,255,.08);border:none"><b style="color:#ff9e9e">${_ult.acc}</b><small style="color:#cfe0ee">Acciones recomendadas</small></div>
       </div>
     </div>
     <div class="two-col">
@@ -1563,20 +1579,22 @@ function savTempImproved(m){var h=m.evo||[],r=[];h.forEach(function(x){if(x.t!=n
 function savY(x){return (x||'').indexOf('26')>=0;}
 /* ===== Modelo de ahorro por RIESGO EVITADO (aprobado): reduccion de prob. de fallo x coste, 12 meses ===== */
 const SAV_PF={0:0,1:0,2:0.03,3:0.08,4:0.15,5:0.30,6:0.45,7:0.65,8:0.80,9:0.90,10:0.95};
-const SAV_COST={elis:2750,_default:2750};
+const SAV_COST={elis:2750,weylchem:5500,_default:2750};
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
 function savRisk(c){
   if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
-  let annual=0,n=0; const visits={};
+  let annual=0,n=0,potential=0,npot=0; const visits={};
   scopedPlants(c).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
     var tr=(m.trend||[]).filter(function(t){return t.g!=null;});
     tr.forEach(function(t){visits[t.l]=1;});
+    var now=(m.grade!=null?m.grade:(tr.length?tr[tr.length-1].g:0));
+    if(now>=5){ potential+=savPf(now)*cost; npot++; }
     if(tr.length<2) return;
-    var gs=tr.map(function(t){return t.g;}),peak=Math.max.apply(null,gs),now=gs[gs.length-1];
+    var gs=tr.map(function(t){return t.g;}),peak=Math.max.apply(null,gs);
     if(peak>now){annual+=(savPf(peak)-savPf(now))*cost;n++;}
   });});});
   var nv=Object.keys(visits).length||1;
-  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),nVisits:nv,nCaught:n,cost:cost};
+  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),potential:Math.round(potential),nPot:npot,nVisits:nv,nCaught:n,cost:cost};
 }
 const SAV_ADV=[
  "<b>Seguridad del personal</b> — evita roturas con proyección de piezas, sobrecalentamientos e incendios cerca de los operarios.",
@@ -1594,14 +1612,20 @@ const SAV_ADV=[
 ];
 function savBlockHTML(c){
   var S=savRisk(c); if(!S) return '';
+  var showA=S.annual>=5000, showP=S.potential>0;
+  if(!showA && !showP) return '';
+  var annualCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro anual estimado</div></div>';
+  var potCard='<div style="text-align:center;background:#fff6e9;border:1px solid #f0d9ac;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#b06f00;line-height:1">'+eur(S.potential)+'</div><div style="font-size:14px;color:#8a6410;margin-top:7px;font-weight:600">fallo potencial detectado</div><div style="font-size:11px;color:#b08a4a;margin-top:2px">'+S.nPot+' equipo(s) en riesgo, vigilados a tiempo</div></div>';
+  var cards=(showA?annualCard:'')+(showP?potCard:'');
+  var heading= showA?'Ahorro estimado por el mantenimiento predictivo':'Valor del mantenimiento predictivo en esta planta';
+  var note= showA
+     ? (S.nCaught+' equipos con fallo detectado a tiempo y corregido. Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada.')
+     : (S.nPot+' equipo(s) en riesgo detectados y vigilados a tiempo, antes de que provoquen una parada. El importe refleja el coste potencial evitable si se dejaran degradar.');
   return '<div style="border:1px solid #e6ecf2;border-radius:14px;padding:24px 20px;margin-top:18px;break-inside:avoid;background:#fafcfe">'
-   +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">Ahorro estimado por el mantenimiento predictivo</b>'
+   +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">'+heading+'</b>'
      +'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · últimos 12 meses</div></div>'
-   +'<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px">'
-     +'<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro anual estimado</div></div>'
-     +'<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.perVisit)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro medio por visita</div></div>'
-   +'</div>'
-   +'<p style="font-size:13px;color:#56687a;text-align:center;max-width:660px;margin:10px auto 0;line-height:1.6">'+S.nCaught+' equipos con fallo detectado a tiempo y corregido. Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada.</p>'
+   +'<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px">'+cards+'</div>'
+   +'<p style="font-size:13px;color:#56687a;text-align:center;max-width:660px;margin:10px auto 0;line-height:1.6">'+note+'</p>'
    +'<div style="margin-top:22px"><b style="font-size:17px;color:#0d2d46">Más allá del ahorro económico</b>'
      +'<p style="font-size:13px;color:#8a98a6;margin:3px 0 12px">Lo que además se consigue al detectar estos fallos a tiempo:</p>'
      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:11px">'
