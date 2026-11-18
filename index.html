@@ -885,11 +885,11 @@ function bundle(ms,kind){
   const bars=labels.slice(-6).map(q=>{const o={label:q,bueno:0,seg:0,alerta:0,peligro:0};ms.forEach(m=>{const e=(m.evo||[]).find(x=>x.q===q);if(e){o[stG(e.g)]++;}});return o;});
   // byfen
   const fc={};
-  if(kind==='vib'){ ms.forEach(m=>{const f=m.fen||{};
+  if(kind==='vib'){ active.forEach(m=>{const f=m.fen||{};
     if(Object.keys(f).length){ Object.keys(f).forEach(k=>{if(f[k]>=3)fc[k]=(fc[k]||0)+1;}); }
     else { (m.fens||[]).forEach(x=>{ if((x.grado||0)>=3){ const k=String(x.f||'').split(' · ')[0].trim(); if(k) fc[k]=(fc[k]||0)+1; } }); }
   }); }
-  else { ms.forEach(m=>{const d=(m.defecto||'').toLowerCase();let k=(!d||d.indexOf('no se detectan')>=0)?'Sin anomalía':d.indexOf('moderado')>=0?'Calentamiento moderado':d.indexOf('leve')>=0?'Calentamiento leve':'Otros defectos';fc[k]=(fc[k]||0)+1;}); }
+  else { active.forEach(m=>{const d=(m.defecto||'').toLowerCase();let k=(!d||d.indexOf('no se detectan')>=0)?'Sin anomalía':d.indexOf('moderado')>=0?'Calentamiento moderado':d.indexOf('leve')>=0?'Calentamiento leve':'Otros defectos';fc[k]=(fc[k]||0)+1;}); }
   const byfen=Object.keys(fc).sort((a,b)=>fc[b]-fc[a]).map(k=>({c:k,n:fc[k],col:(FENCOL[k]||DEFCOL[k]||'#1e6fb0')}));
   // watch grouped by area/family
   const groups={};
@@ -1034,9 +1034,9 @@ function generarInforme(){
   const d=document.createElement('div'); d.innerHTML=html; document.body.appendChild(d.firstChild);
 }
 function dashBlockEl(title,sub,B,ms,cid,pid){
-  const tot=B.tot,n=B.n;const seg=[["#1f9d55",n.bueno],["#9acd32",n.seg],["#f0a500",n.alerta],["#dc3545",n.peligro]];
+  const tot=B.tot,n=B.n;const _nm=n.nomedido||0;const seg=[["#1f9d55",n.bueno],["#9acd32",n.seg],["#f0a500",n.alerta],["#dc3545",n.peligro],["#c3ccd6",_nm]];
   let acc=0,stops=[];seg.forEach(([col,v])=>{const a=acc/tot*360,b=(acc+v)/tot*360;if(v)stops.push(`${col} ${a.toFixed(1)}deg ${b.toFixed(1)}deg`);acc+=v;});
-  const donut=`<div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(${stops.join(",")});position:relative;flex:none"><div style="position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center"><b style="font-size:26px;line-height:1">${tot}</b><small style="color:var(--muted)">${title.indexOf('Vibraciones')>=0?'máquinas':'cuadros'}</small></div></div>`;
+  const donut=`<div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(${stops.join(",")});position:relative;flex:none"><div style="position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center"><b style="font-size:26px;line-height:1">${tot}</b><small style="color:var(--muted)">equipos</small></div></div>`;
   const cmax=Math.max(1,...B.byfen.map(x=>x.n));
   const causes=B.byfen.map(x=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${x.c}</span><b>${x.n}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${x.n/cmax*100}%;height:12px;border-radius:6px;background:${x.col}"></div></div></div>`).join("")||'<span style="color:var(--muted);font-size:12px">—</span>';
   const byArea={};ms.forEach(m=>{const a=famOf(m,title.indexOf('Vibraciones')>=0?'vib':'termo');(byArea[a]=byArea[a]||[]).push(m);});
@@ -1047,8 +1047,8 @@ function dashBlockEl(title,sub,B,ms,cid,pid){
   const rank=B.watch.slice(0,5).map((a,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)"><b style="color:var(--muted);width:18px">${i+1}</b><div style="flex:1"><b style="font-size:13px">${a.area}</b></div>${pill(a.state)}</div>`).join("")||'<div style="color:var(--muted)">—</div>';
   const legend=LEGEND.map(l=>`<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px"><span class="pill ${STATES[l.s].pill}" style="min-width:96px;justify-content:center">${STATES[l.s].label}</span><b style="width:46px">${l.g}</b><span style="color:var(--muted)">${l.n}</span></div>`).join("");
   return `${techHead(title,sub)}
-    <div class="kpi"><div class="card k"><b>${Object.keys(byArea).length}</b><small>Áreas</small></div><div class="card k"><b>${tot}</b><small>${title.indexOf('Vibraciones')>=0?'Máquinas':'Cuadros'} analizados</small></div><div class="card k"><b style="color:var(--g-alerta)">${B.detected}</b><small>En vigilancia (grado ≥3)</small></div><div class="card k"><b style="color:var(--g-peligro)">${B.acc.length}</b><small>Acciones recomendadas</small></div></div>
-    <div class="two-col"><div class="card pad"><b style="font-size:14px">Reparto por estado</b><div style="display:flex;gap:18px;align-items:center;margin-top:12px">${donut}<div style="font-size:13px;line-height:1.9"><div><span class="dot d-bueno"></span>Bueno · ${n.bueno}</div><div><span class="dot d-seg"></span>Seguimiento · ${n.seg}</div><div><span class="dot d-alerta"></span>Atención · ${n.alerta}</div><div><span class="dot d-peligro"></span>Peligro · ${n.peligro}</div></div></div></div>
+    <div class="kpi"><div class="card k"><b>${Object.keys(byArea).length}</b><small>Áreas</small></div><div class="card k"><b>${tot}</b><small>Equipos</small></div><div class="card k"><b style="color:var(--g-alerta)">${B.detected}</b><small>En vigilancia (grado ≥3)</small></div><div class="card k"><b style="color:var(--g-peligro)">${B.acc.length}</b><small>Acciones recomendadas</small></div></div>
+    <div class="two-col"><div class="card pad"><b style="font-size:14px">Reparto por estado</b><div style="display:flex;gap:18px;align-items:center;margin-top:12px">${donut}<div style="font-size:13px;line-height:1.9"><div><span class="dot d-bueno"></span>Bueno · ${n.bueno}</div><div><span class="dot d-seg"></span>Seguimiento · ${n.seg}</div><div><span class="dot d-alerta"></span>Atención · ${n.alerta}</div><div><span class="dot d-peligro"></span>Peligro · ${n.peligro}</div>${_nm?`<div><span class="dot" style="background:#c3ccd6"></span>No medido · ${_nm}</div>`:''}</div></div></div>
       <div class="card pad"><b style="font-size:14px">Causas (por ${title.indexOf('Vibraciones')>=0?'fenómeno':'defecto'})</b><div style="margin-top:12px">${causes}</div></div></div>
     <div class="two-col"><div class="card pad"><b style="font-size:14px">Acciones recomendadas</b><div style="margin-top:6px">${actions}</div></div><div class="card pad"><b style="font-size:14px">Áreas que requieren más atención</b><div style="margin-top:6px">${rank}</div></div></div>
     <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Leyenda de severidad · VIB-KAPTUR</b><div style="margin-top:8px">${legend}</div></div>
