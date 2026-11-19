@@ -455,7 +455,8 @@ function doDownload(){
   var c=(session&&session.role==='client')?session.clientId:((view&&view.cid)||curClient||(session&&session.clientId)||'elis');
   if(!(session&&session.dlToken)){ toast('Preparando la descarga… espera un segundo y vuelve a pulsar.'); return; }
   if(session.role==='client') recordDownload(session.clientId, session.name+(session.plantName?(' · '+session.plantName.replace('Planta ','')):(' · '+(session.puesto||''))));
-  var url='/api/informe.php?c='+encodeURIComponent(c)+'&t='+encodeURIComponent(session.dlToken);
+  var pl=(session&&session.plantId)||((view&&view.pid)||'');
+  var url='/api/informe.php?c='+encodeURIComponent(c)+'&t='+encodeURIComponent(session.dlToken)+(pl?('&p='+encodeURIComponent(pl)):'');
   var fname=reportFilename(c);
   fetch(url).then(function(r){ if(!r.ok) throw new Error('nd'); return r.blob(); }).then(function(b){
     var u=URL.createObjectURL(b); var a=document.createElement('a'); a.href=u; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(u);},1500);
