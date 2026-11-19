@@ -388,7 +388,7 @@ function doRevisar(cid){
 }
 function upPlantId(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return e.value||'';}
 function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return (e.options[e.selectedIndex].text||'').trim();}
-function buildClientSummaryEmail(cid,pl,dlUrl){
+function buildClientSummaryEmail(cid,pl,dlUrl,statsUrl){
   /* Formato aprobado por Pedro (simulacro ELIS): cabecera VIBKAPTUR, 4 contadores y tabla "Equipos más destacados" (estado · equipo · origen), sin recomendaciones */
   var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c) return null;
   var plants=(c.plants||[]); if(pl){ var fp=plants.filter(function(p){return (p.name||'').trim()===pl;}); if(fp.length) plants=fp; }
@@ -405,7 +405,7 @@ function buildClientSummaryEmail(cid,pl,dlUrl){
   var md=String(P0.medicion||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   var mes=md?(MES[parseInt(md[2],10)-1]+' '+md[3]):new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'}).replace(' de ',' ');
   var titulo=(pl?(c.name+' · '+pl):((plants.length===1&&P0.name&&P0.name.toLowerCase().indexOf(String(c.name).toLowerCase())<0)?(c.name+' · '+P0.name):c.name));
-  var sub=[]; if(plants.length===1&&P0.loc&&!/vibraci|termograf/i.test(P0.loc)&&String(P0.loc).toLowerCase().indexOf(String(c.name).toLowerCase())<0) sub.push(P0.loc); sub.push('Análisis de vibraciones'); if(plants.length===1&&P0.medicion) sub.push('Inspección '+P0.medicion);
+  var sub=[]; if(plants.length===1&&P0.loc&&!/vibraci|termograf/i.test(P0.loc)&&String(P0.loc).toLowerCase().indexOf(String(c.name).toLowerCase())<0) sub.push(P0.loc); sub.push('Análisis de vibraciones'); 
   var box=function(n,lab,bg,bd,c1,c2){return '<td width="25%" style="padding:4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="'+bg+'" style="background:'+bg+';border:1px solid '+bd+';border-radius:10px;padding:12px 4px;text-align:center"><div style="font-size:22px;font-weight:800;color:'+c1+'">'+n+'</div><div style="font-size:11px;color:'+c2+';font-weight:600">'+lab+'</div></td></tr></table></td>';};
   var chip=function(g){var t=g>=7?['AVISO','#b91c1c']:g>=5?['ALERTA','#d97706']:['SEGUIMIENTO','#2563eb'];return '<span style="display:inline-block;background:'+t[1]+';color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">&nbsp;'+t[0]+' · G'+g+'&nbsp;</span>';};
   var td='padding:9px 10px;border-bottom:1px solid #eef1f4;font-size:13px;color:#0f172a';
@@ -419,7 +419,8 @@ function buildClientSummaryEmail(cid,pl,dlUrl){
     +'<tr><td style="padding:14px 28px 2px"><p style="font-size:14px;color:#334155;line-height:1.6;margin:0 0 14px">Estimado cliente,<br>ya está disponible el informe de la última campaña de mantenimiento predictivo de su planta. Le resumimos el estado general y los equipos más destacados. El detalle y nuestras recomendaciones los encontrará en el informe completo.</p></td></tr>'
     +'<tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px"><tr>'+box(counts.bueno,'Correctos','#f0fdf4','#bbf7d0','#15803d','#166534')+box(counts.seg,'En seguimiento','#eff6ff','#bfdbfe','#1d4ed8','#1e40af')+box(counts.alerta,'En alerta','#fffbeb','#fde68a','#b45309','#92400e')+box(counts.peligro,'Aviso','#fef2f2','#fecaca','#b91c1c','#991b1b')+'</tr></table><div style="font-size:12px;color:#64748b;text-align:right;margin:2px 4px 16px">'+all.length+' equipos analizados'+(nA>1?(' en '+nA+' áreas'):'')+'</div></td></tr>'
     +'<tr><td style="padding:0 28px">'+tabla+'</td></tr>'
-    +'<tr><td style="padding:22px 28px" align="center"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#2563eb" style="background:#2563eb;border-radius:10px;padding:13px 30px"><a href="'+(dlUrl||('https://vibkaptur.com/?dl='+encodeURIComponent(cid)+((pl&&plants.length===1&&plants[0].id&&(c.plants||[]).length>1)?('&p='+encodeURIComponent(plants[0].id)):'')))+'" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px"><span style="color:#ffffff">'+(dlUrl?'Descargar el informe completo (PDF) →':'Ver el informe completo en VIBKAPTUR →')+'</span></a></td></tr></table><div style="font-size:11px;color:#94a3b8;margin-top:8px">'+(dlUrl?'Descarga directa · también disponible en vibkaptur.com con su usuario':'Acceso con el usuario facilitado por Ingenor Sistemas')+'</div></td></tr>'
+    +'<tr><td style="padding:22px 28px 8px" align="center"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#2563eb" style="background:#2563eb;border-radius:10px;padding:13px 22px"><a href="'+(dlUrl||('https://vibkaptur.com/?dl='+encodeURIComponent(cid)+((pl&&plants.length===1&&plants[0].id&&(c.plants||[]).length>1)?('&p='+encodeURIComponent(plants[0].id)):'')))+'" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px"><span style="color:#ffffff">'+(dlUrl?'Descargar el informe (PDF) →':'Ver el informe completo en VIBKAPTUR →')+'</span></a></td>'+(statsUrl?('<td width="10" style="font-size:1px">&nbsp;</td><td bgcolor="#2f6f52" style="background:#2f6f52;border-radius:10px;padding:13px 22px"><a href="'+statsUrl+'" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px"><span style="color:#ffffff">Análisis estadístico →</span></a></td>'):'')+'</tr></table>'+(statsUrl?'<div style="font-size:11px;color:#94a3b8;margin-top:8px">Análisis estadístico: resumen de resultados para el control de parámetros de eficacia del mantenimiento</div>':'')+'</td></tr>'
+    +'<tr><td style="padding:6px 28px 20px" align="center"><div style="font-size:13px;color:#334155;line-height:1.6">Le recomendamos entrar en la plataforma <a href="https://vibkaptur.com" style="color:#2563eb;font-weight:700;text-decoration:none">vibkaptur.com</a> para ver el mayor detalle: diagnóstico de cada equipo, evolución y estadísticas.</div><div style="font-size:11px;color:#94a3b8;margin-top:6px">Acceso con el usuario facilitado por Ingenor Sistemas</div></td></tr>'
     +'<tr><td bgcolor="#f8fafc" style="background:#f8fafc;border-top:1px solid #eef1f4;padding:16px 28px;border-radius:0 0 14px 14px"><div style="font-size:12px;color:#64748b;line-height:1.5">Ingenor Sistemas · Mantenimiento predictivo<br>Para cualquier consulta técnica sobre este informe, responda a este correo.</div></td></tr>'
     +'</table><div style="color:#94a3b8;font-size:11px;margin-top:14px">VIBKAPTUR · © Ingenor Sistemas 2026</div></td></tr></table>';
   return {html:html,subject:'Informe disponible · '+titulo+' · '+mes};
@@ -439,11 +440,20 @@ function doPublicar(cid,force){
        var dmsg=(D&&D.ok)?('Datos actualizados ('+D.periodo+'): '+D.actualizadas+' con ficha nueva, '+D.ok_sin_ficha+' OK sin ficha, '+D.no_medidas+' no medidas'+((D.nuevas&&D.nuevas.length)?(', '+D.nuevas.length+' nuevas'):'')+'.'):('⚠ Los datos de Análisis y Estadísticas NO se han actualizado'+(D&&D.e?(' (motivo: '+({multiplanta:'cliente con varias plantas, aún no automático',sinfichas:'no hay fichas subidas',sincambios:'ninguna ficha del mes coincide',planta:'planta no indicada',nodatos:'no hay datos previos del cliente'}[D.e]||D.e)+')'):'')+'.');
        h=h+'<p style="font-family:Arial,sans-serif;font-size:12.5px;color:#334155;margin:10px 0">'+dmsg+'</p>';
        var fin=function(){
-         var RS=null; try{ RS=buildClientSummaryEmail(cid,pl,(j&&j.dl)||''); }catch(e){ RS=null; }
-         if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (fase de prueba: de momento solo lo recibe Pedro):</p>'+RS.html; }
-         sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
-           toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+dmsg+' '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
-         });
+         var enviar=function(statsUrl){
+           var RS=null; try{ RS=buildClientSummaryEmail(cid,pl,(j&&j.dl)||'',statsUrl||''); }catch(e){ RS=null; }
+           if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (fase de prueba: de momento solo lo recibe Pedro):</p>'+RS.html; }
+           sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
+             toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+dmsg+' '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
+           });
+         };
+         /* Análisis estadístico: se genera con los datos recién publicados y se guarda en el servidor para el enlace del correo */
+         var mm=((j&&j.dl)||'').match(/[?&]m=([a-z0-9-]+)/), sh='';
+         try{ sh=generarInforme({cid:cid,pid:upPlantId(),ret:true})||''; }catch(e){ sh=''; }
+         if(mm&&sh){
+           fetch('/api/stats.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,p:upPlantId(),m:mm[1],html:sh})})
+             .then(function(r){return r.json();}).then(function(x){ enviar((x&&x.ok&&x.url)||''); }).catch(function(){ enviar(''); });
+         } else enviar('');
        };
        if(D&&D.ok){ loadClientData(session.dlToken).then(fin).catch(fin); } else fin();
      }
@@ -1131,10 +1141,11 @@ function statsBlockEl(title,sub,B,cid,pid){
     ${B.mejJumps?`<p style="font-size:12.8px;color:#1f6f47;background:#e8f3ec;border-radius:8px;padding:8px 12px;margin:2px 0 10px"><b>${B.mejJumps}</b> máquina(s) han mejorado de color de severidad en el año (p. ej. de naranja a amarillo o verde).</p>`:''}
     <div class="two-col"><div class="card pad"><b style="font-size:14px">En la última inspección</b>${ult}</div><div class="card pad"><b style="font-size:14px">Acumuladas (año)</b>${year}</div></div>`;
 }
-function generarInforme(){
-  const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||curClient||DATA.clients[0].id):session.clientId));
-  if(!c){ toast('No hay datos para el informe.'); return; }
-  const PL=scopedPlants(c);
+function generarInforme(opts){
+  opts=opts||{};
+  const c=DATA.clients.find(x=>x.id===(opts.cid||(staff()?(view.cid||curClient||DATA.clients[0].id):session.clientId)));
+  if(!c){ if(!opts.ret) toast('No hay datos para el informe.'); return ''; }
+  let PL=scopedPlants(c); if(opts.pid){ const _f=PL.filter(p=>p.id===opts.pid); if(_f.length) PL=_f; }
   const hoy=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
   const unaPlanta=(PL.length===1);
   let tot=0,aTot=0,aAver=0,aAcc=0,aBuen=0,uTot=0,uAver=0,uAcc=0,uBuen=0,nomed=0,paros=0,bajadas=0,saltos=0; const bloques=[];
@@ -1202,6 +1213,11 @@ function generarInforme(){
         <span>Ingenor Sistemas · VIBKAPTUR — Mantenimiento predictivo</span><span>${hoy}</span>
       </div>
     </div></div>`;
+  if(opts.ret){
+    /* Versión independiente (enlace del correo al cliente): misma hoja, sin la plataforma alrededor */
+    const solo=html.replace(/<button class="btn ghost" onclick="var e=document.getElementById\('informe'\);if\(e\)e.remove\(\)">Cerrar<\/button>/,'');
+    return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe de resultados · '+c.name+'</title><style>body{margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif}.btn{border:0;border-radius:9px;padding:10px 18px;font-weight:700;font-size:13px;color:#fff;cursor:pointer;background:#2f6f52}</style></head><body>'+solo+'</body></html>';
+  }
   const prev=document.getElementById('informe'); if(prev)prev.remove();
   const d=document.createElement('div'); d.innerHTML=html; document.body.appendChild(d.firstChild);
 }
