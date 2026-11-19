@@ -181,12 +181,11 @@ def validate(pdf,fich,ftexts=None):
     def carried(c):
         my=fich.get(c,{}).get('my')
         return rep_my is not None and my is not None and my<rep_my
-    _pdfc=set(pg)|set(pn)
+    _pdftxt=re.sub(r'[^A-Z0-9]','',txt.upper())
     def _inpdf(c):
         if not re.match(r'^\d{3}',c): return True
-        for pc in _pdfc:
-            if c==pc or pc.startswith(c) or c.startswith(pc): return True
-        return False
+        cc=re.sub(r'[^A-Z0-9]','',c.upper())
+        return (cc in _pdftxt) or (len(cc)>=5 and cc[:-1] in _pdftxt)
     fp=[c for c in fich if not carried(c) and not _inpdf(c)]
     if fp: out.append(('Completitud', f'{len(fp)} ficha(s) de este mes no aparecen en el resumen del PDF: '+', '.join(fp[:8])))
     disc=[f'{fich[c]["name"]} ({c}): PDF {g} vs ficha {fich[c]["grade"]}' for c,g in pg.items() if c in fich and fich[c]['grade'] is not None and fich[c]['grade']!=g and not carried(c)]
