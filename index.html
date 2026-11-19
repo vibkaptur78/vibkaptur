@@ -1879,42 +1879,44 @@ const SAV_ADV=[
  "<b>Trazabilidad</b>: el histórico respalda decisiones de mantenimiento e inversión."
 ];
 function savBlockHTML(c,PL){
-  var S=savRisk(c,PL); if(!S) return '';
-  if(!S.nMach) return '';
-  /* Mínimo para enseñar el importe: 5.000 € en general; en plantas con pocas máquinas, 600 € por máquina (criterio de Pedro) */
+  /* Bloque de valor: SIEMPRE cuatro tarjetas (formato fijado por Pedro) y debajo la explicación de cada una.
+     1 Ahorro anual estimado · 2 Ahorro trianual estimado · 3 Fallo potencial detectado · 4 Fiabilidad confirmada */
+  var S=savRisk(c,PL); if(!S||!S.nMach) return '';
+  /* Mínimo para enseñar un importe: 5.000 € en general; en plantas con pocas máquinas, 600 € por máquina */
   var minA=Math.min(5000,600*S.nMach);
-  var showA=S.annual>0 && S.annual>=minA, showP=S.potential>0;
-  var showM=(!showA && S.nCaught>0);  /* hay mejoras reales aunque el importe no llegue al mínimo */
-  var annualCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">'+(S.unaVisita?'ahorro anual estimado':('ahorro estimado en '+(S.anio||'el año')))+'</div></div>';
-  var potCard='<div style="text-align:center;background:#fff6e9;border:1px solid #f0d9ac;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#b06f00;line-height:1">'+eur(S.potential)+'</div><div style="font-size:14px;color:#8a6410;margin-top:7px;font-weight:600">fallo potencial detectado</div><div style="font-size:11px;color:#b08a4a;margin-top:2px">'+S.nPot+' equipo(s) en riesgo, vigilados a tiempo</div></div>';
-  var mejCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+S.nCaught+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">'+(S.nCaught===1?'equipo ha reducido su severidad':'equipos han reducido su severidad')+'</div></div>';
-  var noPotCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:30px;font-weight:800;color:#2f6f52;line-height:1.15">Sin fallo potencial</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">actualmente</div><div style="font-size:11px;color:#5f8f76;margin-top:2px">en la última inspección no se detectan fallos severos</div></div>';
-  var anCard='<div style="text-align:center;background:#eef4fb;border:1px solid #cfdcec;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#1e4f86;line-height:1">'+S.nAn+'</div><div style="font-size:14px;color:#2b5c9e;margin-top:7px;font-weight:600">análisis realizados</div><div style="font-size:11px;color:#6b86a8;margin-top:2px">'+(S.nAn?Math.round(S.nOk/S.nAn*100):0)+'% en buen estado</div></div>';
-  var cap=function(t,card){return '<div style="display:flex;flex-direction:column;align-items:center"><div style="font-size:10.5px;letter-spacing:1.4px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:7px">'+t+'</div>'+card+'</div>';};
-  /* Siempre dos datos: lo acumulado desde enero del año en curso y la situación en la última inspección */
-  /* Trianual: solo si aporta algo más que el anual (hay histórico de años anteriores) y supera el mismo mínimo */
-  var showT=(S.tri>S.annual && S.tri>=minA && S.triDesde<S.anio);
-  var triCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.tri)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro trianual estimado</div><div style="font-size:11px;color:#5f8f76;margin-top:2px">'+S.nTri+' equipo(s) corregidos · '+S.triDesde+'–'+S.anio+'</div></div>';
-  /* Clientes con una sola inspección al año: el ahorro anual se mide de una medida a la siguiente */
-  var capA=S.unaVisita?('De la inspección anterior a la de '+(S.anio||'este año')):('Acumulado '+(S.anio||'del año'));
-  var cards=cap(capA,(showA?annualCard:(showM?mejCard:anCard)))+(showT?cap('Últimos 3 años',triCard):'')+cap('Última inspección',(showP?potCard:noPotCard));
-  var heading= showA?'Ahorro estimado por el mantenimiento predictivo':'Valor del mantenimiento predictivo en esta planta';
-  var note= showA
-     ? (S.nCaught+' equipos con fallo detectado a tiempo y corregido. Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada.')
-     : (!showP) ? ((showM?(S.nCaught+' equipo(s) con un defecto detectado a tiempo que han bajado de severidad tras la actuación de mantenimiento. '):'')+'En la última inspección no se detectan fallos severos potenciales.')
-     : ((showM?(S.nCaught+' equipo(s) han bajado de severidad tras la actuación de mantenimiento. '):'')+S.nPot+' equipo(s) en riesgo detectados y vigilados a tiempo, antes de que provoquen una parada. El importe refleja el coste potencial evitable si se dejaran degradar.');
+  var showA=S.annual>0 && S.annual>=minA, showT=S.tri>0 && S.tri>=minA, showP=S.potential>0;
+  var E=function(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+' €'; };
+  var U=function(n){ return n+' '+(n===1?'equipo':'equipos'); };
+  var G={bg:'#e8f3ec',bd:'#cfe7d8',c1:'#2f6f52',c2:'#1f6f47',c3:'#5f8f76'}, A={bg:'#fff6e9',bd:'#f0d9ac',c1:'#b06f00',c2:'#8a6410',c3:'#b08a4a'}, N={bg:'#f3f6f9',bd:'#dfe6ee',c1:'#64748b',c2:'#64748b',c3:'#8a98a6'};
+  var card=function(tit,val,sub,K,solid){
+    var st=solid?('background:#2f6f52;border:1px solid #2f6f52'):('background:'+K.bg+';border:1px solid '+K.bd);
+    return '<div style="'+st+';border-radius:16px;padding:16px 12px 18px;text-align:center;display:flex;flex-direction:column;justify-content:flex-start;break-inside:avoid">'
+      +'<div style="font-size:10.5px;letter-spacing:1.3px;font-weight:800;text-transform:uppercase;color:'+(solid?'#bfe6cf':K.c2)+';min-height:28px">'+tit+'</div>'
+      +'<div style="font-size:30px;font-weight:800;line-height:1.15;margin-top:6px;color:'+(solid?'#fff':K.c1)+'">'+val+'</div>'
+      +'<div style="font-size:11.5px;margin-top:5px;line-height:1.35;color:'+(solid?'#d6efe0':K.c3)+'">'+sub+'</div></div>';
+  };
+  var perA=S.unaVisita?('de la inspección anterior a la de '+S.anio):('acumulado en '+S.anio);
+  var perT=(S.triDesde<S.anio)?(S.triDesde+'–'+S.anio):('histórico disponible: '+S.anio);
+  var c1= showA ? card('Ahorro anual estimado',E(S.annual),S.nCaught+' equipo(s) corregidos · '+perA,G)
+        : (S.nCaught>0 ? card('Ahorro anual estimado',U(S.nCaught),'han reducido su severidad · '+perA,G)
+                       : card('Ahorro anual estimado','—','sin cambios de severidad · '+perA,N));
+  var c2= showT ? card('Ahorro trianual estimado',E(S.tri),S.nTri+' equipo(s) corregidos · '+perT,G)
+        : (S.nTri>0 ? card('Ahorro trianual estimado',U(S.nTri),'han reducido su severidad · '+perT,G)
+                    : card('Ahorro trianual estimado','—','sin cambios de severidad · '+perT,N));
+  var c3= showP ? card('Fallo potencial detectado',E(S.potential),U(S.nPot)+' en riesgo, vigilados a tiempo',A)
+                : card('Fallo potencial detectado','Sin fallos','en la última inspección no se detectan fallos severos',G);
+  var c4= card('Fiabilidad confirmada',U(S.nFia),(S.nFia===S.nMed?'el total de los analizados':('de '+S.nMed+' analizados'))+' en la última inspección',G,true);
+  var ex=function(t,d){return '<div style="padding:7px 0;border-bottom:1px solid #eef2f6;font-size:12.8px;line-height:1.55;color:#475569"><b style="color:#0d2d46">'+t+'.</b> '+d+'</div>';};
   return '<div style="border:1px solid #e6ecf2;border-radius:14px;padding:24px 20px;margin-top:18px;break-inside:avoid;background:#fafcfe">'
-   +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">'+heading+'</b>'
-     +((!showA&&!showP)?'':'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · acumulado desde enero de '+(S.anio||'')+'</div>')+'</div>'
-   +'<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px">'+cards+'</div>'
-   +'<p style="font-size:13px;color:#56687a;text-align:center;max-width:660px;margin:10px auto 0;line-height:1.6">'+note+'</p>'
-   /* Fiabilidad confirmada: el valor de saber que los equipos están bien (no solo de detectar fallos) */
-   +(S.nFia>0?('<div style="margin:22px auto 0;max-width:720px;background:#2f6f52;border-radius:16px;padding:22px 26px;text-align:center;color:#fff;break-inside:avoid">'
-     +'<div style="font-size:11px;letter-spacing:2.5px;font-weight:800;color:#bfe6cf;text-transform:uppercase">Fiabilidad confirmada</div>'
-     +'<div style="font-size:40px;font-weight:800;line-height:1.1;margin-top:6px;color:#fff">'+S.nFia+' '+(S.nFia===1?'equipo':'equipos')+'</div>'
-     +'<div style="font-size:12.5px;color:#d6efe0;margin-top:3px">'+(S.nFia===S.nMed?'el total de los analizados en la última inspección':('de '+S.nMed+' analizados en la última inspección'))+'</div>'
-     +'<p style="font-size:13.5px;line-height:1.65;color:#f1faf5;max-width:600px;margin:12px auto 0">Cada equipo verificado es una certeza: funciona dentro de los límites admisibles y puede seguir en servicio con plena confianza. Conocer el buen estado de su maquinaria es tan valioso como detectar un fallo.</p>'
-     +'</div>'):'')
+   +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">Valor del mantenimiento predictivo</b>'
+     +'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte)</div></div>'
+   +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin:18px 0 14px">'+c1+c2+c3+c4+'</div>'
+   +'<div style="max-width:760px;margin:0 auto">'
+     +ex('Ahorro anual estimado','Coste de averías evitado '+(S.unaVisita?'entre la inspección anterior y la última':'desde enero del año en curso')+': equipos cuyo defecto se detectó a tiempo y ya han reducido su severidad. Se calcula como reducción de la probabilidad de fallo × coste de una parada no planificada.')
+     +ex('Ahorro trianual estimado','El mismo cálculo acumulado sobre los tres últimos años, para ver el efecto sostenido del seguimiento.')
+     +ex('Fallo potencial detectado','Coste que supondría la avería de los equipos que hoy están en alerta si se dejaran degradar. Es la situación en la última inspección: lo que se está a tiempo de evitar.')
+     +ex('Fiabilidad confirmada','Equipos verificados que funcionan dentro de los límites admisibles y pueden seguir en servicio con plena confianza. Conocer el buen estado de la maquinaria es tan valioso como detectar un fallo.')
+   +'</div>'
    +'<div style="margin-top:22px"><b style="font-size:17px;color:#0d2d46">Más allá del ahorro económico</b>'
      +'<p style="font-size:13px;color:#8a98a6;margin:3px 0 12px">Lo que además se consigue al detectar estos fallos a tiempo:</p>'
      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:11px">'
