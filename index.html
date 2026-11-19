@@ -370,8 +370,15 @@ function doRevisar(cid){
   fetch('/api/revisar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid})})
    .then(function(r){return r.json();}).then(function(j){
      if(j&&j.ok){
-       if(j.n>0) toast('Revisión hecha: '+j.n+' punto(s) a revisar. Aviso enviado a tu correo y a Pedro.');
-       else toast('✔ Revisión correcta, listo para publicar. Aviso enviado a tu correo y a Pedro.');
+       var txt=(j.n>0)?('Revisión hecha: '+j.n+' punto(s) a revisar.'):'✔ Revisión correcta, listo para publicar.';
+       if(j.html){
+         var dest=[session.email,'pedro.ortega@ingenorsistemas.com'].filter(function(e,i,a){return e&&a.indexOf(e)===i;});
+         sendAviso({type:'client',to:dest,subject:j.subject||'VIBKAPTUR - Revisión de informe',html:j.html}).then(function(res){
+           if(res&&res.ok) toast(txt+' Aviso enviado a '+dest.join(' y ')+'.');
+           else toast(txt+' ⚠ El aviso por correo NO se pudo enviar ('+((res&&(res.error||res.detail))||'error')+').');
+         });
+       } else if(j.mail && j.mail>=200 && j.mail<300){ toast(txt+' Aviso enviado a tu correo y a Pedro.'); }
+       else { toast(txt+' ⚠ El aviso por correo no ha salido (código '+(j.mail||'—')+').'); }
      } else {
        var e=(j&&j.e)||'error';
        var m={nopdf:'Falta subir el PDF.',nofichas:'Faltan subir las fichas.',noup:'Tu usuario no tiene permiso de subida.',val:'El validador dio un error.'}[e]||e;
