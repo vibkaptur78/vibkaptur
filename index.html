@@ -322,7 +322,7 @@ function doUpload(cid){
   msg('Subiendo <b>'+f.name+'</b>…');
   var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('pdf',f);
   fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
-    if(j&&j.ok){ msg('✅ Subido. El informe de <b>'+clientName(cid)+'</b> ya está disponible para descargar ('+Math.round(j.bytes/1024)+' KB).'); }
+    if(j&&j.ok){ msg('✅ Informe subido y <b>retenido</b> ('+Math.round(j.bytes/1024)+' KB). Sube las fichas (si faltan), pulsa <b>Revisar informe</b> y luego publica.'); }
     else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que tengas permiso de subida y que sea un PDF.'); }
   }).catch(function(){ msg('Error de conexión al subir el PDF.'); });
 }
@@ -378,6 +378,20 @@ function doRevisar(cid){
        toast('No se pudo revisar: '+m);
      }
    }).catch(function(){ toast('Error de conexión al revisar.'); });
+}
+function doPublicar(cid,force){
+  if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
+  if(force && !confirm('¿Publicar el informe a pesar de los avisos de revisión? El cliente verá esta versión.')) return;
+  toast(force?'Publicando (forzado)…':'Publicando…');
+  fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0})})
+   .then(function(r){return r.json();}).then(function(j){
+     if(j&&j.ok){ toast('✅ Informe publicado'+(force?' (forzado)':'')+'. Ya está disponible para el cliente.'); }
+     else {
+       var e=(j&&j.e)||'error';
+       var m={nopending:'No hay informe pendiente (sube primero el PDF).',move:'No se pudo mover el archivo.',noup:'Tu usuario no tiene permiso.'}[e]||e;
+       toast('No se pudo publicar: '+m);
+     }
+   }).catch(function(){ toast('Error de conexión al publicar.'); });
 }
 function perShort(q){ var M=qNum(q); var mon=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][M%12]; var yy=('0'+(Math.floor(M/12)%100)).slice(-2); return mon+'_'+yy; }
 function reportFilename(cid){
@@ -1411,7 +1425,7 @@ function renderUpload(){
           <div style="font-size:11px;color:var(--muted);margin-top:4px">Sube todas las fichas .xls de la ruta. Después sube el PDF y pulsa «Revisar informe».</div></div>
         <div class="field"><label>Informe completo (PDF) — lo que el cliente descarga</label>
           <input type="file" id="pdfFile" accept="application/pdf,.pdf" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
-          <button class="btn" style="width:100%" onclick="doUpload('${cid}')">⬆ Subir y publicar el PDF de ${cn}</button>
+          <button class="btn" style="width:100%" onclick="doUpload('${cid}')">⬆ Subir informe de ${cn} (queda retenido)</button>
           <div id="upStatus" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px">Este PDF queda guardado como el informe que descargará el cliente (sustituye al anterior).</div></div>
         <div class="field"><label>Informe de termografías (Word .docx) — un único archivo por planta</label>
@@ -1435,6 +1449,11 @@ function renderUpload(){
       <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de publicar, la plataforma comprueba <b>solo dos cosas</b>: (1) <b>ortografía</b> y (2) que los <b>valores y grados</b> cargados <b>coincidan con la ficha (Excel) y el resumen del PDF</b> (errores de transcripción). <b>No valora el análisis ni el diagnóstico</b> — eso es criterio del técnico. Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, a <b>los técnicos y a Pedro</b>, con copia a <b>${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
       <button class="btn" onclick="doRevisar('${cid}')" style="background:var(--green)">✓ Revisar informe ahora</button>
       <button class="btn ghost" onclick="openReviewAviso()" style="margin-left:8px">Ver ejemplo de aviso →</button>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn" onclick="doPublicar('${cid}',false)" style="background:var(--navy)">✓ Dar el OK y publicar</button>
+        <button class="btn ghost" onclick="doPublicar('${cid}',true)">Publicar igualmente (a pesar de los avisos)</button>
+        <span style="font-size:11px;color:var(--muted)">Hasta que no publiques, el cliente sigue viendo el informe anterior.</span>
+      </div>
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--steel-soft);border-color:#cfe3f3">
       <b>💡 Carga inicial del histórico</b><p style="margin:6px 0 0;color:#2c4a63">La primera vez se suben en bloque los informes antiguos (PDF y fichas) y cada máquina arranca con su histórico dentro. A partir de ahí, solo subes el informe del mes , con vuestros propios formatos.</p>
