@@ -1839,12 +1839,16 @@ function savY(x){return (x||'').indexOf('26')>=0;}
 /* Baremo de probabilidad de fallo por grado de severidad (criterio de Ingenor, fijado por Pedro el 19/11/2026) */
 const SAV_PF={0:0,1:0,2:0.02,3:0.10,4:0.30,5:0.60,6:0.80,7:0.92,8:0.99,9:1,10:1};
 const SAV_COST={elis:2750,weylchem:5500,_default:2750};
+/* Incremento x2,5 del coste de avería en clientes/plantas con pocos equipos corregidos, donde el importe quedaba muy bajo (criterio de Pedro, 19/11/2026).
+   Se aplica por cliente (id) o por planta (id de planta). Para añadir o quitar uno, basta con tocar esta lista. */
+const SAV_MULT={msm:2.5,edisonnext:2.5,sacyrformentera:2.5,betanzos:2.5,zabaldea:2.5,reydesa:2.5};
+function savCostOf(c,p){ var base=SAV_COST[c.id]||SAV_COST._default; var m=(p&&SAV_MULT[p.id])||SAV_MULT[c.id]||1; return base*m; }
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
 function savRisk(c,PL){
-  if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
+  if(!c) return null; let cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
   let annual=0,n=0,potential=0,npot=0,nmach=0,nan=0,nok=0,tri=0,ntri=0,y3min=9999,nmed=0,nfia=0; const visits={};
   var _allM=[]; (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){ if(m.tmax===undefined) _allM.push(m); });});}); var Y=yearOfSet(_allM);
-  (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
+  (PL||scopedPlants(c)).forEach(function(p){ cost=savCostOf(c,p); p.areas.forEach(function(a){a.machines.forEach(function(m){
     if(m.nomedido||m.placeholder) return;
     var tr=histAll(m).filter(function(t){return t.g!=null;});
     if(tr.length||m.tmax===undefined) nmach++;   /* máquinas con seguimiento (no cuenta cuadros de termografía sin histórico) */
