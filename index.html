@@ -1844,6 +1844,10 @@ const SAV_COST={elis:2750,weylchem:5500,_default:2750};
 const SAV_MULT={msm:2.5,edisonnext:2.5,sacyrformentera:2.5,betanzos:2.5,zabaldea:2.5,reydesa:2.5};
 function savCostOf(c,p){ var base=SAV_COST[c.id]||SAV_COST._default; var m=(p&&SAV_MULT[p.id])||SAV_MULT[c.id]||1; return base*m; }
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
+/* El FALLO POTENCIAL mantiene el baremo anterior y el coste normal, sin incremento (decisión de Pedro, 19/11/2026):
+   así depende solo de cuántos equipos hay en alerta y en qué grado, y es comparable entre plantas. */
+const SAV_PF_POT={0:0,1:0,2:0.03,3:0.08,4:0.15,5:0.30,6:0.45,7:0.65,8:0.80,9:0.90,10:0.95};
+function savPfPot(g){g=Math.round(g||0);return SAV_PF_POT[Math.max(0,Math.min(10,g))];}
 function savRisk(c,PL){
   if(!c) return null; let cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
   let annual=0,n=0,potential=0,npot=0,nmach=0,nan=0,nok=0,tri=0,ntri=0,y3min=9999,nmed=0,nfia=0; const visits={};
@@ -1855,7 +1859,7 @@ function savRisk(c,PL){
     var ys=yearSeries(m,Y);
     ys.inY.forEach(function(t){visits[t.l]=1; nan++; if(t.g<=2) nok++;});
     var now=(m.grade!=null?m.grade:(tr.length?tr[tr.length-1].g:0));
-    if(now>=5){ potential+=savPf(now)*cost; npot++; }
+    if(now>=5){ potential+=savPfPot(now)*(SAV_COST[c.id]||SAV_COST._default); npot++; }
     if(m.grade!=null||tr.length){ nmed++; if(now<=4) nfia++; }
     var gs=(ys.base?[ys.base.g]:[]).concat(ys.inY.map(function(t){return t.g;}));
     if(gs.length<2) return;
