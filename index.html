@@ -343,6 +343,42 @@ function doUploadWord(cid){
     else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que sea un .docx y que tengas permiso de subida.'); }
   }).catch(function(){ msg('Error de conexión al subir el Word.'); });
 }
+function doUploadFichas(cid){
+  var inp=document.getElementById('fichasFiles');
+  var st=document.getElementById('upStatusF');
+  function msg(t){ if(st)st.innerHTML=t; }
+  if(!inp||!inp.files||!inp.files.length){ msg('Elige primero las fichas (.xls).'); return; }
+  if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
+  var files=Array.prototype.slice.call(inp.files);
+  var okc=0, err=0, i=0;
+  msg('Subiendo <b>'+files.length+'</b> fichas…');
+  function next(){
+    if(i>=files.length){ msg('✅ <b>'+okc+'</b> fichas subidas'+(err?(' · '+err+' con error'):'')+'. Ahora sube el PDF y pulsa «Revisar informe».'); return; }
+    var f=files[i++];
+    var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('ficha',f);
+    fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
+      if(j&&j.ok) okc++; else err++;
+      msg('Subiendo… '+(okc+err)+'/'+files.length);
+      next();
+    }).catch(function(){ err++; next(); });
+  }
+  next();
+}
+function doRevisar(cid){
+  if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
+  toast('Revisando el informe en el servidor…');
+  fetch('/api/revisar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid})})
+   .then(function(r){return r.json();}).then(function(j){
+     if(j&&j.ok){
+       if(j.n>0) toast('Revisión hecha: '+j.n+' punto(s) a revisar. Aviso enviado a tu correo y a Pedro.');
+       else toast('✔ Revisión correcta, listo para publicar. Aviso enviado a tu correo y a Pedro.');
+     } else {
+       var e=(j&&j.e)||'error';
+       var m={nopdf:'Falta subir el PDF.',nofichas:'Faltan subir las fichas.',noup:'Tu usuario no tiene permiso de subida.',val:'El validador dio un error.'}[e]||e;
+       toast('No se pudo revisar: '+m);
+     }
+   }).catch(function(){ toast('Error de conexión al revisar.'); });
+}
 function perShort(q){ var M=qNum(q); var mon=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][M%12]; var yy=('0'+(Math.floor(M/12)%100)).slice(-2); return mon+'_'+yy; }
 function reportFilename(cid){
   var c=DATA.clients.find(function(x){return x.id===cid;});
@@ -1368,8 +1404,11 @@ function renderUpload(){
     <div class="two-col">
       <div class="card pad">
         <b style="font-size:14px">1 · Sube el informe completo</b>
-        <div class="field" style="margin-top:12px"><label>Todas las fichas de la ruta (Excel) — arrastra varias a la vez</label>
-          <div class="uploader">📊 Arrastra aquí <b>todas las fichas .xls</b><br><span style="font-size:12px">La plataforma lee cada ficha y detecta máquina, severidad, fenómenos/temperaturas y diagnóstico</span></div></div>
+        <div class="field" style="margin-top:12px"><label>Todas las fichas de la ruta (Excel) — selecciona varias a la vez</label>
+          <input type="file" id="fichasFiles" accept=".xls,.xlsx,.xlsm" multiple style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
+          <button class="btn" style="width:100%" onclick="doUploadFichas('${cid}')">📊 Subir las fichas de ${cn}</button>
+          <div id="upStatusF" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Sube todas las fichas .xls de la ruta. Después sube el PDF y pulsa «Revisar informe».</div></div>
         <div class="field"><label>Informe completo (PDF) — lo que el cliente descarga</label>
           <input type="file" id="pdfFile" accept="application/pdf,.pdf" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
           <button class="btn" style="width:100%" onclick="doUpload('${cid}')">⬆ Subir y publicar el PDF de ${cn}</button>
@@ -1395,7 +1434,8 @@ function renderUpload(){
     <div class="card pad" style="margin-top:14px;border-left:4px solid var(--steel)">
       <b style="font-size:14px">2.5 · Revisión antes de publicar — la hago yo (Claude)</b>
       <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de publicar, la plataforma comprueba <b>solo dos cosas</b>: (1) <b>ortografía</b> y (2) que los <b>valores y grados</b> cargados <b>coincidan con la ficha (Excel) y el resumen del PDF</b> (errores de transcripción). <b>No valora el análisis ni el diagnóstico</b> — eso es criterio del técnico. Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, a <b>los técnicos y a Pedro</b>, con copia a <b>${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
-      <button class="btn" onclick="openReviewAviso()">Ver aviso de revisión →</button>
+      <button class="btn" onclick="doRevisar('${cid}')" style="background:var(--green)">✓ Revisar informe ahora</button>
+      <button class="btn ghost" onclick="openReviewAviso()" style="margin-left:8px">Ver ejemplo de aviso →</button>
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--steel-soft);border-color:#cfe3f3">
       <b>💡 Carga inicial del histórico</b><p style="margin:6px 0 0;color:#2c4a63">La primera vez se suben en bloque los informes antiguos (PDF y fichas) y cada máquina arranca con su histórico dentro. A partir de ahí, solo subes el informe del mes — igual que Preconcerto, pero con vuestros formatos.</p>
