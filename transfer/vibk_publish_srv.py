@@ -470,7 +470,7 @@ def main():
     try: _own,_otro=pdf_owner(pdfwords,data,cid,datapath,P)
     except Exception: _own,_otro=None,''
     res['coinciden']=len(upd); res['total_fichas']=_tot; res['pdf_cliente']=_own; res['pdf_otro']=_otro
-    res['sospechoso']=bool((_tot>=3 and _antes>=3 and len(upd)*3<_tot) or (_otro and not _own))
+    res['sospechoso']=bool((_tot>=3 and _antes>=3 and len(upd)*2<_tot) or (_otro and not _own))
     if strict and res['sospechoso']:
         res['ok']=False; res['e']='otrocliente'; print(json.dumps(res,ensure_ascii=False)); return
     if not upd and not added:
