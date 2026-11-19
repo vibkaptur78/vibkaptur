@@ -1607,7 +1607,7 @@ function renderUpload(){
       </div>
       <div class="card pad">
         <b style="font-size:14px">2 · Destino y análisis automático</b>
-        <div class="field" style="margin-top:12px"><label>Cliente</label><select onchange="setUploadCid(this.value)">${DATA.clients.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${c.name}</option>`).join('')}</select></div>
+        <div class="field" style="margin-top:12px"><label>Cliente</label><div style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:#f6f8fb;font-weight:700">🔒 ${cl.name}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Fijado para evitar errores. Para subir a otro cliente usa «Cambiar de cliente».</div></div>
         <div class="field"><label>Planta${cl&&cl.plants.length>1?' — las fichas y el PDF se guardan y revisan por planta':''}</label><select id="upPlanta" onchange="uploadPid=this.value;upBanner()">${plantOpts}</select></div>
         <div class="field"><label>Técnica</label><select><option>Se detecta de las fichas (vibraciones / termografía)</option></select></div>
         <div style="background:#f6fafc;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;color:#2c4a63;line-height:1.6;margin:4px 0 12px">
@@ -1623,10 +1623,6 @@ function renderUpload(){
         <button class="btn" onclick="doPublicar('${cid}',false)" style="background:var(--navy)">✓ Dar el OK y publicar</button>
         <button class="btn ghost" onclick="doPublicar('${cid}',true)">Publicar igualmente (a pesar de los avisos)</button>
         <span style="font-size:11px;color:var(--muted)">Hasta que no publiques, el cliente sigue viendo el informe anterior.</span>
-      </div>
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button class="btn ghost" onclick="doPublicar('${cid}',false)">↻ Volver a enviar el resumen del informe ya publicado</button>
-        <span style="font-size:11px;color:var(--muted)">No hace falta subir de nuevo el PDF ni las fichas: se reenvía el último informe publicado de esta planta.</span>
       </div>
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--steel-soft);border-color:#cfe3f3">
@@ -1659,10 +1655,10 @@ function renderUpload(){
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--navy);color:#fff">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div><b style="color:#fff">4 · Lanzar el informe al cliente</b><p style="margin:4px 0 0;color:#cfe0ee;font-size:12.5px">Un resumen compacto que se lee de un vistazo, con botón para descargar el informe completo. Lo mismo aunque el cliente no entre a la plataforma.</p></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn ghost" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)" onclick="showEmailPreview('${cid}')">Previsualizar aviso</button>
-          <button class="btn" style="background:var(--green)" onclick="showEmailPreview('${cid}')">Lanzar aviso a ${cn} →</button>
+        <div><b style="color:#fff">4 · Resumen del informe para el cliente</b><p style="margin:4px 0 0;color:#cfe0ee;font-size:12.5px">El resumen sale solo al publicar: estado general, equipos más destacados, descarga del informe (PDF) y análisis estadístico. Aquí puedes verlo o volver a enviarlo sin subir nada de nuevo. En fase de prueba solo lo recibe Pedro.</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)" onclick="showEmailPreview('${cid}')">Previsualizar resumen</button>
+          <button class="btn" style="background:var(--green)" onclick="doPublicar('${cid}',false)">↻ Volver a enviar el resumen de ${cn} →</button>
         </div>
       </div>
     </div>
@@ -2126,44 +2122,17 @@ function tecnicoApprove(){
 
 /* ============================================================= EMAIL PREVIEW */
 function showEmailPreview(cid){
-  cid=cid||'elis';
-  const S=emailSummary(cid), cn=clientName(cid);
-  const rec=CONTACTS[cid]||[];
-  const to=rec.length?rec.map(r=>r.e).join(", "):"cliente@ejemplo.com";
-  const chip=g=>{const c=g>=7?'#d23b3b':g>=5?'#e08a00':'#2f9e63';return `<span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:#fff;background:${c};border-radius:6px;padding:2px 0;font-size:12px">${g}</span>`;}
-  const rows=S.crit.slice(0,5).map(m=>`<div style="display:flex;gap:9px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2f6">
-      ${chip(m.grade)}<div style="flex:1;font-size:12.5px"><b>${m.area} · ${m.name}</b>${m.rec?`<span style="color:#64748b"> — ${m.rec}</span>`:''}</div></div>`).join("")
-    || `<div style="color:#2f9e63;font-size:13px;padding:6px 0">Todas las máquinas en buen estado ✔</div>`;
-  const toList=rec.length?rec.map(r=>`${r.n} <${r.e}>`).join(" · "):"sin destinatarios — añádelos antes de enviar";
-  const html=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:560px">
-    <div class="mh">Resumen que recibirá ${cn} <span style="cursor:pointer" onclick="closeModal()">✕</span></div>
-    <div class="mb" style="background:#f4f7fa">
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-        <b>Para:</b> <span id="toMail">${to}</span><br>
-        <b>Asunto:</b> Informe de vibraciones · ${cn} · ${S.counts.peligro} crítica(s) y ${S.counts.alerta} a vigilar</div>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
-        <div style="background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:9px"><img src="assets2/logo-white.png" style="height:20px" onerror="this.style.display='none'"><b style="font-size:13.5px">Ingenor · Mantenimiento Predictivo</b></div>
-        <div style="padding:16px 18px">
-          <p style="margin:0 0 4px;font-size:13.5px">Hola ${cn},</p>
-          <p style="margin:0 0 11px;font-size:13px;color:#475569">Ya está disponible vuestro informe de <b>noviembre 2026</b>. De un vistazo:</p>
-          <div style="display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap">
-            <span style="background:#e8f3ec;color:#1f6b45;font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px">${S.counts.bueno} en buen estado</span>
-            <span style="background:#fff3dc;color:#b06f00;font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px">${S.counts.alerta} en atención</span>
-            ${S.counts.peligro?`<span style="background:#fce8e8;color:#d23b3b;font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px">${S.counts.peligro} en peligro</span>`:''}
-          </div>
-          <div style="font-weight:700;font-size:12px;color:#334155;margin:0 0 4px">Puntos a vigilar</div>
-          ${rows}
-          <div style="text-align:center;margin:16px 0 6px">${session.canDownload!==false?`<span onclick="doDownload()" style="background:var(--green);color:#fff;padding:12px 26px;border-radius:9px;font-weight:800;display:inline-block;font-size:14px;cursor:pointer">⬇ Descargar informe completo (PDF)</span>`:`<span style="background:#eef2f6;color:#8a97a4;padding:12px 26px;border-radius:9px;font-weight:700;display:inline-block;font-size:13px">🔒 Descarga no disponible para técnicos</span>`}</div>
-          <p style="margin:10px 0 0;font-size:12px;color:#94a3b8;text-align:center">${S.tot} máquinas revisadas · inspección 03/11/2026</p>
-          <p style="margin:12px 0 0;font-size:13px">Un saludo,<br>Equipo Ingenor</p>
-        </div>
-      </div>
-      <p style="font-size:11px;color:var(--muted);margin:10px 2px 0"><b>Destinatarios guardados:</b> ${toList}</p>
+  /* Vista previa del resumen REAL que se envía al publicar (mismo generador que el correo) */
+  if(!upReady(cid)) return;
+  var RS=null; try{ RS=buildClientSummaryEmail(cid,upPlantName(),'',''); }catch(e){ RS=null; }
+  if(!RS){ toast('No hay datos de vibraciones de este cliente para montar el resumen.'); return; }
+  const html=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:700px">
+    <div class="mh">Resumen que recibe el cliente <span style="cursor:pointer" onclick="closeModal()">✕</span></div>
+    <div class="mb" style="background:#f1f5f9;padding:0;max-height:70vh;overflow:auto">
+      <div style="font-size:11.5px;color:var(--muted);padding:10px 16px 0"><b>Asunto:</b> ${RS.subject}<br>Los botones de descarga y de análisis estadístico se activan con sus enlaces al publicar o reenviar.</div>
+      ${RS.html}
     </div>
-    <div class="mf" style="gap:8px">
-      <button class="btn ghost" onclick="closeModal()">Cerrar</button>
-      <button class="btn" style="flex:1" onclick="sendReport('${cid}')">✉ Enviar a los ${rec.length} destinatarios</button>
-    </div>
+    <div class="mf" style="gap:8px"><button class="btn ghost" onclick="closeModal()">Cerrar</button></div>
   </div></div>`;
   const d=document.createElement("div");d.id="modal";d.innerHTML=html;document.body.appendChild(d);
 }
