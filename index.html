@@ -373,7 +373,7 @@ function doRevisar(cid){
        var txt=(j.n>0)?('Revisión hecha: '+j.n+' punto(s) a revisar.'):'✔ Revisión correcta, listo para publicar.';
        if(j.html){
          var dest=[session.email,'pedro.ortega@ingenorsistemas.com'].filter(function(e,i,a){return e&&a.indexOf(e)===i;});
-         sendAviso({type:'client',to:dest,subject:j.subject||'VIBKAPTUR - Revisión de informe',html:j.html}).then(function(res){
+         var pl=upPlantName(); sendAviso({type:'client',to:dest,subject:(j.subject||'VIBKAPTUR - Revisión de informe')+(pl?(' · '+pl):''),html:pl?j.html.replace('subido a la plataforma.','subido a la plataforma — planta: <b>'+pl+'</b>.'):j.html}).then(function(res){
            if(res&&res.ok) toast(txt+' Aviso enviado a '+dest.join(' y ')+'.');
            else toast(txt+' ⚠ El aviso por correo NO se pudo enviar ('+((res&&(res.error||res.detail))||'error')+').');
          });
@@ -386,6 +386,29 @@ function doRevisar(cid){
      }
    }).catch(function(){ toast('Error de conexión al revisar.'); });
 }
+function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return (e.options[e.selectedIndex].text||'').trim();}
+function buildClientSummaryEmail(cid,pl){
+  var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c) return null;
+  var plants=(c.plants||[]); if(pl){ var fp=plants.filter(function(p){return (p.name||'').trim()===pl;}); if(fp.length) plants=fp; }
+  var all=[]; plants.forEach(function(p){(p.areas||[]).forEach(function(a){(a.machines||[]).forEach(function(m){ if(!m.nomedido) all.push(Object.assign({area:a.name},m)); });});});
+  if(!all.length) return null;
+  var counts={bueno:0,seg:0,alerta:0,peligro:0}; all.forEach(function(m){ if(counts[m.state]!==undefined) counts[m.state]++; });
+  var crit=all.filter(function(m){return (m.grade||0)>=5;}).sort(function(a,b){return b.grade-a.grade;});
+  var cn=c.name+(pl?(' · '+pl):'');
+  var mes=new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  var chip=function(g){var col=g>=7?'#d23b3b':g>=5?'#e08a00':'#2f9e63';return '<span style="display:inline-block;min-width:30px;text-align:center;font-weight:800;color:#fff;background:'+col+';border-radius:6px;padding:2px 0;font-size:12px;margin-right:9px">'+g+'</span>';};
+  var rows=crit.slice(0,5).map(function(m){var r=m.rec||m.recomendacion||'';return '<div style="padding:6px 0;border-bottom:1px solid #eef2f6;font-size:12.5px">'+chip(m.grade)+'<b>'+m.area+' · '+m.name+'</b>'+(r?'<span style="color:#64748b"> — '+r+'</span>':'')+'</div>';}).join('') || '<div style="color:#2f9e63;font-size:13px;padding:6px 0">Todas las máquinas en buen estado ✔</div>';
+  var pill=function(bg,col,t){return '<span style="display:inline-block;background:'+bg+';color:'+col+';font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px;margin:0 6px 6px 0">'+t+'</span>';};
+  var html='<div style="font-family:Arial,sans-serif;max-width:560px;border:1px solid #dfe6ee;border-radius:10px;overflow:hidden"><div style="background:#0d2d46;color:#fff;padding:12px 16px"><b style="font-size:13.5px">Ingenor · Mantenimiento Predictivo</b></div><div style="padding:16px 18px;color:#333">'
+    +'<p style="margin:0 0 4px;font-size:13.5px">Hola '+cn+',</p>'
+    +'<p style="margin:0 0 11px;font-size:13px;color:#475569">Ya está disponible vuestro informe de <b>'+mes+'</b>. De un vistazo:</p>'
+    +'<div style="margin:0 0 8px">'+pill('#e8f3ec','#1f6b45',counts.bueno+' en buen estado')+pill('#fff3dc','#b06f00',counts.alerta+' en atención')+(counts.peligro?pill('#fce8e8','#d23b3b',counts.peligro+' en peligro'):'')+'</div>'
+    +'<div style="font-weight:700;font-size:12px;color:#334155;margin:0 0 4px">Puntos a vigilar</div>'+rows
+    +'<div style="text-align:center;margin:16px 0 6px"><a href="https://vibkaptur.com" style="background:#2f9e63;color:#fff;padding:12px 26px;border-radius:9px;font-weight:800;display:inline-block;font-size:14px;text-decoration:none">⬇ Descargar informe completo (PDF)</a></div>'
+    +'<p style="margin:10px 0 0;font-size:12px;color:#94a3b8;text-align:center">'+all.length+' máquinas revisadas</p>'
+    +'<p style="margin:12px 0 0;font-size:13px">Un saludo,<br>Equipo Ingenor</p></div></div>';
+  return {html:html,subject:'Informe de vibraciones · '+cn+' · '+counts.peligro+' crítica(s) y '+counts.alerta+' a vigilar'};
+}
 function doPublicar(cid,force){
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
   if(force && !confirm('¿Publicar el informe a pesar de los avisos de revisión? El cliente verá esta versión.')) return;
@@ -393,10 +416,13 @@ function doPublicar(cid,force){
   fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0})})
    .then(function(r){return r.json();}).then(function(j){
      if(j&&j.ok){
-       var cn=clientName(cid);
+       var cn=clientName(cid); var pl=upPlantName(); if(pl) cn=cn+' · '+pl;
        var dest=[session.email,'pedro.ortega@ingenorsistemas.com'].filter(function(e,i,a){return e&&a.indexOf(e)===i;});
        var h='<div style="font-family:Arial,sans-serif;max-width:620px"><div style="background:#0d2d46;color:#fff;padding:14px 18px;font-weight:bold">INGENOR · VIBKAPTUR — Informe publicado</div><div style="padding:18px 20px;color:#333;font-size:13.5px;line-height:1.6"><p>Hola,</p><p>El informe de <b>'+cn+'</b> ha sido <b>publicado</b> en la plataforma por '+(session.email||'un técnico')+' y ya está disponible para el cliente.</p>'+(force?'<p style="color:#b45309"><b>Publicado igualmente:</b> se ha publicado sin esperar a corregir los avisos de la revisión.</p>':'<p>Publicado tras la revisión automática.</p>')+'<p style="color:#8a98a6;font-size:12px;margin:10px 0 0">— VIBKAPTUR · aviso automático</p></div></div>';
-       sendAviso({type:'client',to:dest,subject:'VIBKAPTUR - Informe publicado: '+cn+(force?' (publicado igualmente)':''),html:h}).then(function(res){
+       var subj='VIBKAPTUR - Informe publicado: '+cn+(force?' (publicado igualmente)':'');
+       var RS=null; try{ RS=buildClientSummaryEmail(cid,pl); }catch(e){ RS=null; }
+       if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (copia interna: todavía no se envía al cliente):</p>'+RS.html; }
+       sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
          toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
        });
      }
@@ -1452,7 +1478,7 @@ function renderUpload(){
       <div class="card pad">
         <b style="font-size:14px">2 · Destino y análisis automático</b>
         <div class="field" style="margin-top:12px"><label>Cliente</label><select onchange="setUploadCid(this.value)">${DATA.clients.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${c.name}</option>`).join('')}</select></div>
-        <div class="field"><label>Planta</label><select>${plantOpts}</select></div>
+        <div class="field"><label>Planta</label><select id="upPlanta">${plantOpts}</select></div>
         <div class="field"><label>Técnica</label><select><option>Se detecta de las fichas (vibraciones / termografía)</option></select></div>
         <div style="background:#f6fafc;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;color:#2c4a63;line-height:1.6;margin:4px 0 12px">
           <b>La plataforma hará sola:</b><br>• Crear/actualizar cada máquina con su estado y grado<br>• Guardar la medida y <b>quitar la 5ª más antigua</b> (ventana de 4)<br>• Pintar fenómenos, RMS, imágenes térmicas y diagnóstico<br>• Recalcular estadísticas, análisis y alarmas</div>
