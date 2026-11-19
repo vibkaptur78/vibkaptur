@@ -607,9 +607,20 @@ function startSession(u, remember){
 /* Homogeneidad: en todas las gráficas (fenómenos y tendencias) se muestran las últimas HIST_N mediciones de cada máquina.
    El histórico completo sigue guardado en el servidor; aquí solo se recorta lo que se pinta. */
 var HIST_N=5;
+/* Fechas sin complicaciones: en toda la plataforma se muestra mes y año, no el día exacto */
+function mesAnio(v){
+  var M=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'], A=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  var s=String(v==null?'':v).trim(); if(!s) return '';
+  var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){ var y=+m[3]; if(y<100) y+=2000; return (M[+m[2]-1]||'')+' '+y; }
+  m=s.match(/^([a-z]{3})-(\d{2})$/i); if(m&&A.indexOf(m[1].toLowerCase())>=0) return M[A.indexOf(m[1].toLowerCase())]+' 20'+m[2];
+  return s;
+}
 function trimHistory(clients){
   (clients||[]).forEach(function(c){ (c.plants||[]).forEach(function(p){ (p.areas||[]).forEach(function(a){ (a.machines||[]).forEach(function(m){
-    if(!m||m.tmax!==undefined) return;
+    if(!m) return;
+    if(m.insp) m.insp=mesAnio(m.insp);
+    else if(m.tmax===undefined && !m.nomedido && Array.isArray(m.trend) && m.trend.length) m.insp=mesAnio(m.trend[m.trend.length-1].l);
+    if(m.tmax!==undefined) return;
     var last=function(arr){ return Array.isArray(arr)?arr.slice(-HIST_N):arr; };
     if(Array.isArray(m.trend)&&m.trend.length){
       var keep={}; m.trend=m.trend.slice(-HIST_N); m.trend.forEach(function(t){ keep[t.l]=1; });
@@ -778,15 +789,18 @@ function renderPlant(){
   const _tOrd=['Vibraciones','Termografía','Ultrasonidos','Endoscopia','Análisis de aceite'];
   techsPresent.sort((a,b)=>{const ia=_tOrd.indexOf(a),ib=_tOrd.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
   const tabs=isTermo?["Global"].concat(techsPresent):TECHS;
+  const _hasVib=p.areas.some(a=>a.machines.some(m=>m.tmax===undefined&&!m.placeholder));
+  const _servicio=(currentTech==='Global'&&techsPresent.length>1)?techsPresent.join(' · '):((currentTech==='Global'&&c.id!=='elis'&&techsPresent.length===1&&techsPresent[0]==='Vibraciones')?vibMeta.servicio:meta.servicio);
+  const _periodo=mesAnio((currentTech==='Global'&&_hasVib)?vibMeta.medicion:meta.medicion)||'—';
   let out=`<main>
     <div class="crumbs"><span onclick="go({name:'plants'})">${staff()?'Plantas':'Mis plantas'}</span> › <b>${p.name}</b></div>
     <div class="hero" style="background-image:linear-gradient(90deg,rgba(9,29,46,.9),rgba(9,29,46,.25)),url('${p.hero||'assets2/plant-elis.jpg'}')">
-      <div class="hero-in"><div class="hero-sub">${c.name} · Inspección ${meta.medicion}</div><h1>${p.name}</h1></div>
+      <div class="hero-in"><div class="hero-sub">${c.name} · ${_periodo}</div><h1>${p.name}</h1></div>
     </div>`;
   if(session.role==="admin") out+=adminBanner("Puedes cambiar el estado de cualquier máquina pulsando el botón ✎ de su fila.");
   // technique tabs
   out+=`<p style="color:var(--muted);font-size:12.5px;margin:-2px 0 12px">👉 Pulsa cualquier ${currentTech==='Vibraciones'?'máquina':(isTermo&&currentTech!=='Vibraciones'?'cuadro':'máquina')} para ver su <b>análisis detallado</b>: ${currentTech==='Vibraciones'?'severidad por fenómeno y evolución':(isTermo?'imagen térmica, temperaturas y descripción del defecto':'diagnóstico por fenómeno, evolución y ficha con espectros')}.</p>`;
-  out+=`<div class="card pad" style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:20px;font-size:12.5px"><div><small style="color:var(--muted)">Servicio</small><br><b>${meta.servicio}</b></div><div><small style="color:var(--muted)">Medición</small><br><b>${meta.medicion}</b></div><div><small style="color:var(--muted)">Técnico</small><br><b>${meta.tecnico}</b></div><div><small style="color:var(--muted)">Aprobado</small><br><b>${meta.aprobado}</b></div><div style="flex:1 1 220px"><small style="color:var(--muted)">Equipos</small><br><b>${meta.equipos}</b></div></div>`;
+  out+=`<div class="card pad" style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:28px;font-size:12.5px"><div><small style="color:var(--muted)">Servicio</small><br><b>${_servicio}</b></div><div><small style="color:var(--muted)">Periodo</small><br><b>${_periodo}</b></div></div>`;
   out+=`<div class="card"><div class="tech-tabs">`;
   tabs.forEach(t=>out+=`<a class="${t===currentTech?'active':''}" onclick="setTech('${t}')">${t}</a>`);
   out+=`</div>`;
@@ -797,7 +811,7 @@ function renderPlant(){
      <span><span class="dot d-mant"></span>Mantenimiento</span></div></div>`;
   // table
   out+=`<table><thead><tr><th style="width:46%">Área / Máquina</th><th>${currentTech==='Vibraciones'?"Severidad":(isTermo?"Tª máx.":"Técnicas")}</th><th>Estado</th><th>Inspección</th><th style="text-align:right">Detalle</th></tr></thead><tbody>`;
-  const _areaTech=a=>a.machines.some(m=>m.vib)?0:(a.machines.some(m=>m.tmax!==undefined||(m.techs||[]).includes('Termografía'))?1:2);
+  const _areaTech=a=>a.machines.some(m=>m.vib||(m.tmax===undefined&&((m.techs||[]).includes('Vibraciones')||(m.fens&&m.fens.length)||(m.trend&&m.trend.length))))?0:(a.machines.some(m=>m.tmax!==undefined||(m.techs||[]).includes('Termografía'))?1:2);
   const areasOrdered=(currentTech==='Global')?[...p.areas].sort((x,y)=>_areaTech(x)-_areaTech(y)):p.areas;
   areasOrdered.forEach((a,ai)=>{
     const areaMs=a.machines.filter(m=> currentTech==="Global" || (m.techs||[]).includes(currentTech));
@@ -1219,7 +1233,7 @@ function renderOtuaView(mode){
   let plants = PL.filter(p=>p.id===activePid);
   if(!plants.length) plants=PL.slice(0,1);
   const _titulo = plants[0] ? plants[0].name : c.name;
-  const sel = PL.length>1 ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px">${PL.map(p=>`<button class="btn ${p.id===activePid?'':'ghost'} sm" onclick="go({name:'${mode}',cid:'${c.id}',pid:'${p.id}'})">${p.name.replace('Planta ','')}</button>`).join('')}</div>` : '';
+  const sel = (PL.length>1 && !(view.pid && PL.some(p=>p.id===view.pid))) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px">${PL.map(p=>`<button class="btn ${p.id===activePid?'':'ghost'} sm" onclick="go({name:'${mode}',cid:'${c.id}',pid:'${p.id}'})">${p.name.replace('Planta ','')}</button>`).join('')}</div>` : '';
   let out=`<main><h1>${mode==='stats'?'Estadísticas':'Análisis'} — ${_titulo}</h1><p class="sub">En las plantas con varias técnicas, primero vibraciones y luego termografía.</p>${sel}`;
   if(mode==='stats') out+=`<div class="noprint" style="margin:2px 0 16px"><button class="btn" onclick="generarInforme()" style="background:var(--green)">📄 Generar informe de resultados (PDF)</button> <span style="color:var(--muted);font-size:12px;margin-left:6px">Resumen descargable de las mejoras conseguidas con el mantenimiento predictivo.</span></div>`;
   plants.forEach(p=>{
