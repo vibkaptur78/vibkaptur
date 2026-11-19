@@ -388,7 +388,7 @@ function doRevisar(cid){
 }
 function upPlantId(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return e.value||'';}
 function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return (e.options[e.selectedIndex].text||'').trim();}
-function buildClientSummaryEmail(cid,pl){
+function buildClientSummaryEmail(cid,pl,dlUrl){
   var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c) return null;
   var plants=(c.plants||[]); if(pl){ var fp=plants.filter(function(p){return (p.name||'').trim()===pl;}); if(fp.length) plants=fp; }
   var all=[]; plants.forEach(function(p){(p.areas||[]).forEach(function(a){(a.machines||[]).forEach(function(m){ if(!m.nomedido&&!m.placeholder) all.push(Object.assign({area:a.name},m)); });});});
@@ -410,7 +410,7 @@ function buildClientSummaryEmail(cid,pl){
     +'<p style="margin:0 0 11px;font-size:13px;color:#475569">Ya está disponible vuestro informe de <b>'+mes+'</b>. De un vistazo:</p>'
     +'<div style="margin:0 0 8px">'+pill('#e8f3ec','#1f6b45',counts.bueno+' en buen estado')+(counts.seg?pill('#eaf1fb','#2b5c9e',counts.seg+' en seguimiento'):'')+pill('#fff3dc','#b06f00',counts.alerta+' en atención')+(counts.peligro?pill('#fce8e8','#d23b3b',counts.peligro+' en peligro'):'')+'</div>'
     +'<div style="font-weight:700;font-size:12px;color:#334155;margin:0 0 4px">Puntos a vigilar</div>'+rows
-    +'<div style="text-align:center;margin:16px 0 6px"><a href="https://vibkaptur.com/?dl='+encodeURIComponent(cid)+((pl&&plants.length===1&&plants[0].id&&(c.plants||[]).length>1)?('&p='+encodeURIComponent(plants[0].id)):'')+'" style="background:#2f9e63;color:#fff;padding:12px 26px;border-radius:9px;font-weight:800;display:inline-block;font-size:14px;text-decoration:none">⬇ Descargar informe completo (PDF)</a></div>'
+    +'<div style="text-align:center;margin:16px 0 6px"><a href="'+(dlUrl||('https://vibkaptur.com/?dl='+encodeURIComponent(cid)+((pl&&plants.length===1&&plants[0].id&&(c.plants||[]).length>1)?('&p='+encodeURIComponent(plants[0].id)):'')))+'" style="background:#2f9e63;color:#fff;padding:12px 26px;border-radius:9px;font-weight:800;display:inline-block;font-size:14px;text-decoration:none">⬇ Descargar informe completo (PDF)</a></div>'
     +'<p style="margin:10px 0 0;font-size:12px;color:#94a3b8;text-align:center">'+all.length+' máquinas revisadas</p>'
     +'<p style="margin:12px 0 0;font-size:13px">Un saludo,<br>Equipo Ingenor</p></div></div>';
   return {html:html,subject:'Informe de vibraciones · '+cn+' · '+counts.peligro+' crítica(s) y '+counts.alerta+' a vigilar'};
@@ -430,7 +430,7 @@ function doPublicar(cid,force){
        var dmsg=(D&&D.ok)?('Datos actualizados ('+D.periodo+'): '+D.actualizadas+' con ficha nueva, '+D.ok_sin_ficha+' OK sin ficha, '+D.no_medidas+' no medidas'+((D.nuevas&&D.nuevas.length)?(', '+D.nuevas.length+' nuevas'):'')+'.'):('⚠ Los datos de Análisis y Estadísticas NO se han actualizado'+(D&&D.e?(' (motivo: '+({multiplanta:'cliente con varias plantas, aún no automático',sinfichas:'no hay fichas subidas',sincambios:'ninguna ficha del mes coincide',planta:'planta no indicada',nodatos:'no hay datos previos del cliente'}[D.e]||D.e)+')'):'')+'.');
        h=h+'<p style="font-family:Arial,sans-serif;font-size:12.5px;color:#334155;margin:10px 0">'+dmsg+'</p>';
        var fin=function(){
-         var RS=null; try{ RS=buildClientSummaryEmail(cid,pl); }catch(e){ RS=null; }
+         var RS=null; try{ RS=buildClientSummaryEmail(cid,pl,(j&&j.dl)||''); }catch(e){ RS=null; }
          if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (fase de prueba: de momento solo lo recibe Pedro):</p>'+RS.html; }
          sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
            toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+dmsg+' '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
