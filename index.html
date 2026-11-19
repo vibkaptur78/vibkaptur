@@ -392,7 +392,14 @@ function doPublicar(cid,force){
   toast(force?'Publicando (forzado)…':'Publicando…');
   fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0})})
    .then(function(r){return r.json();}).then(function(j){
-     if(j&&j.ok){ toast('✅ Informe publicado'+(force?' (forzado)':'')+'. Ya está disponible para el cliente.'); }
+     if(j&&j.ok){
+       var cn=clientName(cid);
+       var dest=[session.email,'pedro.ortega@ingenorsistemas.com'].filter(function(e,i,a){return e&&a.indexOf(e)===i;});
+       var h='<div style="font-family:Arial,sans-serif;max-width:620px"><div style="background:#0d2d46;color:#fff;padding:14px 18px;font-weight:bold">INGENOR · VIBKAPTUR — Informe publicado</div><div style="padding:18px 20px;color:#333;font-size:13.5px;line-height:1.6"><p>Hola,</p><p>El informe de <b>'+cn+'</b> ha sido <b>publicado</b> en la plataforma por '+(session.email||'un técnico')+' y ya está disponible para el cliente.</p>'+(force?'<p style="color:#b45309"><b>Publicado igualmente:</b> se ha publicado sin esperar a corregir los avisos de la revisión.</p>':'<p>Publicado tras la revisión automática.</p>')+'<p style="color:#8a98a6;font-size:12px;margin:10px 0 0">— VIBKAPTUR · aviso automático</p></div></div>';
+       sendAviso({type:'client',to:dest,subject:'VIBKAPTUR - Informe publicado: '+cn+(force?' (publicado igualmente)':''),html:h}).then(function(res){
+         toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
+       });
+     }
      else {
        var e=(j&&j.e)||'error';
        var m={nopending:'No hay informe pendiente (sube primero el PDF).',move:'No se pudo mover el archivo.',noup:'Tu usuario no tiene permiso.'}[e]||e;
