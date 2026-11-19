@@ -725,7 +725,7 @@ function renderPlant(){
   const _MO=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   let _lastL='',_lastN=-1; p.areas.forEach(a=>a.machines.forEach(m=>{ if(m.nomedido||m.tmax!==undefined) return; const t=(m.trend||[]); if(!t.length) return; const l=String(t[t.length-1].l||''); const mm=l.match(/^([a-z]{3})-(\d{2})$/); if(!mm) return; const n=(+mm[2])*12+_MO.indexOf(mm[1]); if(n>_lastN){_lastN=n;_lastL=l;} }));
   const _medVib=p.medicion||(_lastL?((_ML[_lastL.slice(0,3)]||_lastL.slice(0,3))+' 20'+_lastL.slice(4)):'—');
-  const vibMeta={servicio:"Análisis de vibraciones",medicion:_medVib,tecnico:(p.tecnico||"Ingenor Sistemas"),aprobado:"Pedro Ortega",equipos:"Colector de vibraciones · Acelerómetros · Software VIB-KAPTUR"};
+  const vibMeta={servicio:"Análisis de vibraciones",medicion:_medVib,tecnico:(p.tecnico||"Ingenor Sistemas"),aprobado:(p.aprobado||"Pedro Ortega"),equipos:"Colector de vibraciones · Acelerómetros · Software VIB-KAPTUR"};
   const meta=currentTech==='Vibraciones'?vibMeta:(isTermo?termoMeta:META);
   const _tOrd=['Vibraciones','Termografía','Ultrasonidos','Endoscopia','Análisis de aceite'];
   techsPresent.sort((a,b)=>{const ia=_tOrd.indexOf(a),ib=_tOrd.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
