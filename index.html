@@ -288,7 +288,7 @@ function sendAviso(payload){
   // payload: {type:'review'|'client', subject, html, to?}
   if(!BREVO.ready) return Promise.resolve({simulated:true});
   return fetch(BREVO.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)})
+    body:JSON.stringify(Object.assign({},payload,{t:(session&&session.dlToken)||''}))})
     .then(r=>r.ok?r.json():r.text().then(t=>({error:r.status,detail:t}))).catch(e=>({error:String(e)}));
 }
 /* Construye el HTML del aviso de revisión (correo al equipo técnico + Pedro). */
