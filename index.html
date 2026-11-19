@@ -662,6 +662,7 @@ function trimHistory(clients){
     else if(m.tmax===undefined && !m.nomedido && Array.isArray(m.trend) && m.trend.length) m.insp=mesAnio(m.trend[m.trend.length-1].l);
     if(m.tmax!==undefined) return;
     var last=function(arr){ return Array.isArray(arr)?arr.slice(-HIST_N):arr; };
+    if(Array.isArray(m.trend)&&!m._trendAll) m._trendAll=m.trend.slice();   /* histórico completo: lo usan las estadísticas del año */
     if(Array.isArray(m.trend)&&m.trend.length){
       var keep={}; m.trend=m.trend.slice(-HIST_N); m.trend.forEach(function(t){ keep[t.l]=1; });
       var byk=function(arr,k){ if(!Array.isArray(arr)) return arr; var f=arr.filter(function(x){return keep[x[k]];}); return f.length?f:arr.slice(-HIST_N); };
@@ -1058,12 +1059,22 @@ function msOfKind(plant,kind){const r=[];plant.areas.forEach(a=>a.machines.forEa
 // banda de color de severidad: verde(1-2) < amarillo(3-4) < naranja(5-6) < rojo(7-10)
 function sevBand(g){return g>=7?3:g>=5?2:g>=3?1:0;}
 function bandName(r){return ['verde','amarillo','naranja','rojo'][r]||'verde';}
+/* ===== Estadísticas del AÑO EN CURSO: todo lo medido desde enero del año de la última inspección (histórico completo, no solo las 5 últimas) ===== */
+function histAll(m){ return (m&&m._trendAll&&m._trendAll.length)?m._trendAll:((m&&m.trend)||[]); }
+function yearOfSet(ms){ var y=0; (ms||[]).forEach(function(m){ histAll(m).forEach(function(t){ if(t.g==null) return; var k=Math.floor(qNum(t.l)/12); if(k>y) y=k; }); }); return y; }
+function yearSeries(m,Y){
+  var h=histAll(m).filter(function(t){return t.g!=null;}).slice().sort(function(a,b){return qNum(a.l)-qNum(b.l);});
+  var inY=h.filter(function(t){return Math.floor(qNum(t.l)/12)===Y;}), bef=h.filter(function(t){return Math.floor(qNum(t.l)/12)<Y;});
+  return {inY:inY, base:(bef.length?bef[bef.length-1]:null)};
+}
+function yearGrades(m,Y){ var ys=yearSeries(m,Y); return (ys.base?[ys.base.g]:[]).concat(ys.inY.map(function(t){return t.g;})); }
 function calcMej(ms){
-  const ult=[],year=[];let jumps=0;
+  const ult=[],year=[];let jumps=0; const _Y=yearOfSet(ms);
   ms.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);
     if(s.length>=2){const last=s[s.length-1],prev=s[s.length-2],peak=Math.max.apply(null,s);
       if(last<prev)ult.push({m:m.name,de:prev,a:last});
-      if(last<peak){const bf=sevBand(peak),bt=sevBand(last);const o={m:m.name,de:peak,a:last,bFrom:bf,bTo:bt,jump:bf-bt};year.push(o);if(bf>bt)jumps++;}}});
+      const _yg=(m.tmax===undefined)?yearGrades(m,_Y):s; const _pk=_yg.length?Math.max.apply(null,_yg):peak;
+      if(_yg.length>=2 && last<_pk){ const peak=_pk;const bf=sevBand(peak),bt=sevBand(last);const o={m:m.name,de:peak,a:last,bFrom:bf,bTo:bt,jump:bf-bt};year.push(o);if(bf>bt)jumps++;}}});
   return {ult,year,jumps};
 }
 function qNum(q){
@@ -1101,7 +1112,7 @@ function bundle(ms,kind){
   // mejoras
   const {ult:mejUltL,year:mejYearL,jumps:mejJumps}=calcMej(ms);
   let parosEvit=0; const averiasDet=ms.filter(m=>(m.grade||0)>=3).length;
-  ms.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s=e.map(x=>x.g).filter(g=>g!=null);if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});
+  {const _YP=yearOfSet(ms);ms.forEach(m=>{const e=(m.evo&&m.evo.length)?m.evo:(m.trend||[]);const s0=e.map(x=>x.g).filter(g=>g!=null);const s=(m.tmax===undefined)?yearGrades(m,_YP):s0;if(s.length>=2){const last=s[s.length-1],peak=Math.max.apply(null,s);if(peak>=5&&last<peak)parosEvit++;}});}
   // ahorro
   const CF=costeFallo(),comp={parada:AHORRO.costeHoraParada*AHORRO.horasParada,repuestos:AHORRO.repuestos,mano:AHORRO.manoObra,tnp:AHORRO.tiempoNoProductivo};
   let total=0,risk=0,per=[],cTot={parada:0,repuestos:0,mano:0,tnp:0};
@@ -1109,8 +1120,9 @@ function bundle(ms,kind){
   per.sort((x,y)=>y.eur-x.eur);
   // KPIs anual = suma de TODOS los análisis de todos los informes (cada punto de histórico cuenta)
   let _aTot=0,_aBuen=0,_aAver=0,_aAcc=0;
-  ms.forEach(m=>{(m.trend||[]).forEach(t=>{if(t.g==null)return;_aTot++;if(t.g<=2)_aBuen++;if(t.g>=5)_aAver++;if(t.g>=4)_aAcc++;});});
-  const anual={tot:_aTot,aver:_aAver,acc:_aAcc,buen:_aBuen,okpct:_aTot?Math.round(_aBuen/_aTot*100):0};
+  const _YB=yearOfSet(ms);
+  ms.forEach(m=>{yearSeries(m,_YB).inY.forEach(t=>{_aTot++;if(t.g<=2)_aBuen++;if(t.g>=5)_aAver++;if(t.g>=4)_aAcc++;});});
+  const anual={anio:_YB,tot:_aTot,aver:_aAver,acc:_aAcc,buen:_aBuen,okpct:_aTot?Math.round(_aBuen/_aTot*100):0};
   // última inspección = solo las medidas esta vez; averías grado>=5; acciones = las que llevan recomendación
   const _isRec=m=>m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0 && m.recomendacion.toUpperCase().indexOf('NO SE DETECTAN')<0;
   const _utot=active.length;
@@ -1146,7 +1158,7 @@ function statsBlockEl(title,sub,B,cid,pid){
   const areaBars=B.watch.map(w=>{const mx=w.items.reduce((a,it)=>Math.max(a,it.g),0);return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${w.area}</span><b style="color:${gcol(mx)}">${w.items.length} equipo${w.items.length>1?'s':''} · máx ${mx}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${Math.max(6,w.items.length/_amax*100)}%;height:12px;border-radius:6px;background:${gcol(mx)}"></div></div></div>`;}).join("")||'<span style="color:var(--muted);font-size:12px">Sin incidencias por área.</span>';
   const topBars=_allit.sort((a,b)=>b.g-a.g).slice(0,6).map(it=>`<div onclick="go({name:'machine',cid:'${cid}',pid:'${pid}',mid:'${it.id}'})" style="display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="flex:none;min-width:30px;text-align:center;font-weight:800;color:${gcol(it.g)};background:${gbg(it.g)};border-radius:7px;padding:3px 0">${it.g}</span><div style="flex:1"><b style="font-size:12.8px">${it.n}</b><div style="color:var(--muted);font-size:11.5px">${it.area}</div></div><span style="color:var(--steel);font-weight:700">→</span></div>`).join("")||'<span style="color:var(--muted);font-size:12px">Sin equipos en vigilancia.</span>';
   return `${techHead(title,sub)}
-    <div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--steel);margin:2px 0 6px">ACUMULADO DEL AÑO</div>
+    <div style="font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--steel);margin:2px 0 6px">ACUMULADO DEL AÑO ${B.anual.anio||''}</div>
     <div class="kpi">${tile(B.anual.tot,'Análisis realizados (año)','var(--navy)')}${tile(B.anual.okpct+'%','En buen estado (año)','var(--g-bueno)')}${tile(B.anual.aver,'Averías detectadas ≥5 (año)','var(--g-alerta)')}${tile(B.anual.acc,'Acciones recomendadas (año)','var(--g-peligro)')}</div>
     <div class="card pad" style="background:linear-gradient(90deg,#0d2d46,#15466b);color:#fff;margin-bottom:14px"><b style="font-size:15px;color:#fff">El trabajo de Ingenor — última inspección</b><p style="color:#cfe0ee;font-size:12px;margin:4px 0 12px">Estado en la última visita realizada a la planta.</p>
       <div class="kpi" style="margin:0">
@@ -1723,7 +1735,7 @@ function renderStats(){
   const MJ=calcMej(_EMS);
   const _AMa=_AM.filter(m=>!m.nomedido);
   let _aT=0,_aB=0,_aA=0,_aC=0;
-  _AM.forEach(m=>{(m.trend||[]).forEach(t=>{if(t.g==null)return;_aT++;if(t.g<=2)_aB++;if(t.g>=5)_aA++;if(t.g>=4)_aC++;});});
+  const _YE=yearOfSet(_AM); _AM.forEach(m=>{yearSeries(m,_YE).inY.forEach(t=>{_aT++;if(t.g<=2)_aB++;if(t.g>=5)_aA++;if(t.g>=4)_aC++;});});
   const _anual={tot:_aT,aver:_aA,acc:_aC,buen:_aB,okpct:_aT?Math.round(_aB/_aT*100):0};
   const _isRecE=m=>m.recomendacion && m.recomendacion.toUpperCase().indexOf('NO REQUIERE')<0 && m.recomendacion.toUpperCase().indexOf('NO SE DETECTAN')<0;
   const _uT=_AMa.length;
@@ -1829,20 +1841,23 @@ const SAV_COST={elis:2750,weylchem:5500,_default:2750};
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
 function savRisk(c,PL){
   if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
-  let annual=0,n=0,potential=0,npot=0,nmach=0; const visits={};
+  let annual=0,n=0,potential=0,npot=0,nmach=0,nan=0,nok=0; const visits={};
+  var _allM=[]; (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){ if(m.tmax===undefined) _allM.push(m); });});}); var Y=yearOfSet(_allM);
   (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
     if(m.nomedido||m.placeholder) return;
-    var tr=(m.trend||[]).filter(function(t){return t.g!=null;});
+    var tr=histAll(m).filter(function(t){return t.g!=null;});
     if(tr.length||m.tmax===undefined) nmach++;   /* máquinas con seguimiento (no cuenta cuadros de termografía sin histórico) */
-    tr.forEach(function(t){visits[t.l]=1;});
+    var ys=yearSeries(m,Y);
+    ys.inY.forEach(function(t){visits[t.l]=1; nan++; if(t.g<=2) nok++;});
     var now=(m.grade!=null?m.grade:(tr.length?tr[tr.length-1].g:0));
     if(now>=5){ potential+=savPf(now)*cost; npot++; }
-    if(tr.length<2) return;
-    var gs=tr.map(function(t){return t.g;}),peak=Math.max.apply(null,gs);
+    var gs=(ys.base?[ys.base.g]:[]).concat(ys.inY.map(function(t){return t.g;}));
+    if(gs.length<2) return;
+    var peak=Math.max.apply(null,gs);
     if(peak>now){annual+=(savPf(peak)-savPf(now))*cost;n++;}
   });});});
   var nv=Object.keys(visits).length||1;
-  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),potential:Math.round(potential),nPot:npot,nVisits:nv,nCaught:n,cost:cost,nMach:nmach};
+  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),potential:Math.round(potential),nPot:npot,nVisits:nv,nCaught:n,cost:cost,nMach:nmach,anio:Y,nAn:nan,nOk:nok};
 }
 const SAV_ADV=[
  "<b>Seguridad del personal</b> — evita roturas con proyección de piezas, sobrecalentamientos e incendios cerca de los operarios.",
@@ -1865,11 +1880,14 @@ function savBlockHTML(c,PL){
   var minA=Math.min(5000,600*S.nMach);
   var showA=S.annual>0 && S.annual>=minA, showP=S.potential>0;
   var showM=(!showA && S.nCaught>0);  /* hay mejoras reales aunque el importe no llegue al mínimo */
-  var annualCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro anual estimado</div></div>';
+  var annualCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro estimado en '+(S.anio||'el año')+'</div></div>';
   var potCard='<div style="text-align:center;background:#fff6e9;border:1px solid #f0d9ac;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#b06f00;line-height:1">'+eur(S.potential)+'</div><div style="font-size:14px;color:#8a6410;margin-top:7px;font-weight:600">fallo potencial detectado</div><div style="font-size:11px;color:#b08a4a;margin-top:2px">'+S.nPot+' equipo(s) en riesgo, vigilados a tiempo</div></div>';
   var mejCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+S.nCaught+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">'+(S.nCaught===1?'equipo ha reducido su severidad':'equipos han reducido su severidad')+'</div></div>';
   var noPotCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:30px;font-weight:800;color:#2f6f52;line-height:1.15">Sin fallo potencial</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">actualmente</div><div style="font-size:11px;color:#5f8f76;margin-top:2px">en la última inspección no se detectan fallos severos</div></div>';
-  var cards=(showA?annualCard:'')+(showM?mejCard:'')+(showP?potCard:noPotCard);
+  var anCard='<div style="text-align:center;background:#eef4fb;border:1px solid #cfdcec;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#1e4f86;line-height:1">'+S.nAn+'</div><div style="font-size:14px;color:#2b5c9e;margin-top:7px;font-weight:600">análisis realizados</div><div style="font-size:11px;color:#6b86a8;margin-top:2px">'+(S.nAn?Math.round(S.nOk/S.nAn*100):0)+'% en buen estado</div></div>';
+  var cap=function(t,card){return '<div style="display:flex;flex-direction:column;align-items:center"><div style="font-size:10.5px;letter-spacing:1.4px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:7px">'+t+'</div>'+card+'</div>';};
+  /* Siempre dos datos: lo acumulado desde enero del año en curso y la situación en la última inspección */
+  var cards=cap('Acumulado '+(S.anio||'del año'),(showA?annualCard:(showM?mejCard:anCard)))+cap('Última inspección',(showP?potCard:noPotCard));
   var heading= showA?'Ahorro estimado por el mantenimiento predictivo':'Valor del mantenimiento predictivo en esta planta';
   var note= showA
      ? (S.nCaught+' equipos con fallo detectado a tiempo y corregido. Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada.')
@@ -1877,7 +1895,7 @@ function savBlockHTML(c,PL){
      : ((showM?(S.nCaught+' equipo(s) han bajado de severidad tras la actuación de mantenimiento. '):'')+S.nPot+' equipo(s) en riesgo detectados y vigilados a tiempo, antes de que provoquen una parada. El importe refleja el coste potencial evitable si se dejaran degradar.');
   return '<div style="border:1px solid #e6ecf2;border-radius:14px;padding:24px 20px;margin-top:18px;break-inside:avoid;background:#fafcfe">'
    +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">'+heading+'</b>'
-     +((!showA&&!showP)?'':'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · últimos 12 meses</div>')+'</div>'
+     +((!showA&&!showP)?'':'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · acumulado desde enero de '+(S.anio||'')+'</div>')+'</div>'
    +'<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px">'+cards+'</div>'
    +'<p style="font-size:13px;color:#56687a;text-align:center;max-width:660px;margin:10px auto 0;line-height:1.6">'+note+'</p>'
    +'<div style="margin-top:22px"><b style="font-size:17px;color:#0d2d46">Más allá del ahorro económico</b>'
