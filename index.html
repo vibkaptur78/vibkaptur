@@ -1841,7 +1841,7 @@ const SAV_COST={elis:2750,weylchem:5500,_default:2750};
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
 function savRisk(c,PL){
   if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
-  let annual=0,n=0,potential=0,npot=0,nmach=0,nan=0,nok=0; const visits={};
+  let annual=0,n=0,potential=0,npot=0,nmach=0,nan=0,nok=0,tri=0,ntri=0,y3min=9999; const visits={};
   var _allM=[]; (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){ if(m.tmax===undefined) _allM.push(m); });});}); var Y=yearOfSet(_allM);
   (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
     if(m.nomedido||m.placeholder) return;
@@ -1855,9 +1855,13 @@ function savRisk(c,PL){
     if(gs.length<2) return;
     var peak=Math.max.apply(null,gs);
     if(peak>now){annual+=(savPf(peak)-savPf(now))*cost;n++;}
+    /* trianual: mismo criterio sobre los tres últimos años (Y-2 … Y), con la medida anterior como punto de partida */
+    var h3=tr.slice().sort(function(a,b){return qNum(a.l)-qNum(b.l);}), in3=h3.filter(function(t){return Math.floor(qNum(t.l)/12)>=Y-2;}), bf3=h3.filter(function(t){return Math.floor(qNum(t.l)/12)<Y-2;});
+    var g3=(bf3.length?[bf3[bf3.length-1].g]:[]).concat(in3.map(function(t){return t.g;}));
+    if(g3.length>=2){ var pk3=Math.max.apply(null,g3); if(pk3>now){ tri+=(savPf(pk3)-savPf(now))*cost; ntri++; } in3.forEach(function(t){ var yy=Math.floor(qNum(t.l)/12); if(yy<y3min) y3min=yy; }); }
   });});});
   var nv=Object.keys(visits).length||1;
-  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),potential:Math.round(potential),nPot:npot,nVisits:nv,nCaught:n,cost:cost,nMach:nmach,anio:Y,nAn:nan,nOk:nok};
+  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),potential:Math.round(potential),nPot:npot,nVisits:nv,nCaught:n,cost:cost,nMach:nmach,anio:Y,nAn:nan,nOk:nok,tri:Math.round(tri),nTri:ntri,triDesde:(y3min<9999?y3min:Y),unaVisita:(Object.keys(visits).length<=1)};
 }
 const SAV_ADV=[
  "<b>Seguridad del personal</b> — evita roturas con proyección de piezas, sobrecalentamientos e incendios cerca de los operarios.",
@@ -1880,14 +1884,19 @@ function savBlockHTML(c,PL){
   var minA=Math.min(5000,600*S.nMach);
   var showA=S.annual>0 && S.annual>=minA, showP=S.potential>0;
   var showM=(!showA && S.nCaught>0);  /* hay mejoras reales aunque el importe no llegue al mínimo */
-  var annualCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro estimado en '+(S.anio||'el año')+'</div></div>';
+  var annualCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">'+(S.unaVisita?'ahorro anual estimado':('ahorro estimado en '+(S.anio||'el año')))+'</div></div>';
   var potCard='<div style="text-align:center;background:#fff6e9;border:1px solid #f0d9ac;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#b06f00;line-height:1">'+eur(S.potential)+'</div><div style="font-size:14px;color:#8a6410;margin-top:7px;font-weight:600">fallo potencial detectado</div><div style="font-size:11px;color:#b08a4a;margin-top:2px">'+S.nPot+' equipo(s) en riesgo, vigilados a tiempo</div></div>';
   var mejCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+S.nCaught+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">'+(S.nCaught===1?'equipo ha reducido su severidad':'equipos han reducido su severidad')+'</div></div>';
   var noPotCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:30px;font-weight:800;color:#2f6f52;line-height:1.15">Sin fallo potencial</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">actualmente</div><div style="font-size:11px;color:#5f8f76;margin-top:2px">en la última inspección no se detectan fallos severos</div></div>';
   var anCard='<div style="text-align:center;background:#eef4fb;border:1px solid #cfdcec;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#1e4f86;line-height:1">'+S.nAn+'</div><div style="font-size:14px;color:#2b5c9e;margin-top:7px;font-weight:600">análisis realizados</div><div style="font-size:11px;color:#6b86a8;margin-top:2px">'+(S.nAn?Math.round(S.nOk/S.nAn*100):0)+'% en buen estado</div></div>';
   var cap=function(t,card){return '<div style="display:flex;flex-direction:column;align-items:center"><div style="font-size:10.5px;letter-spacing:1.4px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:7px">'+t+'</div>'+card+'</div>';};
   /* Siempre dos datos: lo acumulado desde enero del año en curso y la situación en la última inspección */
-  var cards=cap('Acumulado '+(S.anio||'del año'),(showA?annualCard:(showM?mejCard:anCard)))+cap('Última inspección',(showP?potCard:noPotCard));
+  /* Trianual: solo si aporta algo más que el anual (hay histórico de años anteriores) y supera el mismo mínimo */
+  var showT=(S.tri>S.annual && S.tri>=minA && S.triDesde<S.anio);
+  var triCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.tri)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro trianual estimado</div><div style="font-size:11px;color:#5f8f76;margin-top:2px">'+S.nTri+' equipo(s) corregidos · '+S.triDesde+'–'+S.anio+'</div></div>';
+  /* Clientes con una sola inspección al año: el ahorro anual se mide de una medida a la siguiente */
+  var capA=S.unaVisita?('De la inspección anterior a la de '+(S.anio||'este año')):('Acumulado '+(S.anio||'del año'));
+  var cards=cap(capA,(showA?annualCard:(showM?mejCard:anCard)))+(showT?cap('Últimos 3 años',triCard):'')+cap('Última inspección',(showP?potCard:noPotCard));
   var heading= showA?'Ahorro estimado por el mantenimiento predictivo':'Valor del mantenimiento predictivo en esta planta';
   var note= showA
      ? (S.nCaught+' equipos con fallo detectado a tiempo y corregido. Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada.')
