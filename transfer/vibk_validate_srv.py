@@ -118,31 +118,23 @@ def pdf_resumen(pdf):
     return grades,nomed,(m.group(0) if m else None),txt
 import datetime as _dt
 _WHITE=set("""rms tag vibkaptur ingenor weylchem kronospan betanzos otua rodamiento rodamientos desequilibrio desequilibrios desalineacion desalineacion acoplamiento acoplamientos engrase engrases holgura holguras espectro espectros armonico armonicos cojinete cojinetes chumacera chumaceras impulsor impulsores rodete rodetes ventilador ventiladores soplante soplantes reductor reductora reductoras multiplicadora acelerometro termografia termografia vibraciones vibracion envolvente cinematica engranaje engranajes polea poleas correa correas oleum absorcion sulfurico demi azufre fusion reglaje severidad satisfactorio insatisfactorio atencion significativo cuadro cuadros estabilidad""".split())
-_SPELL=None
-def _get_spell():
-    global _SPELL
-    if _SPELL is None:
-        try:
-            from spellchecker import SpellChecker
-            sp=SpellChecker(language='es',distance=1); sp.word_frequency.load_words(_WHITE); _SPELL=sp
-        except Exception:
-            _SPELL=False
-    return _SPELL
+_WHITE2=set(u"acelerómetro acelerómetros termográfica termográficas videoscopía endoscopía holgura".split())
 def spell_findings(texts):
-    sp=_get_spell()
-    if not sp: return []
-    words={}
-    for src in texts:
-        for w in re.findall(r"[A-Za-z\u00c1\u00c9\u00cd\u00d3\u00da\u00dc\u00d1\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1]+", src or ''):
-            if len(w)<5 or w.isupper() or any(ch.isdigit() for ch in w): continue
-            lw=w.lower()
-            if lw in _WHITE: continue
-            words.setdefault(lw,w)
-    out=[]
-    for lw in sorted(sp.unknown(list(words.keys()))):
-        corr=sp.correction(lw)
-        if corr and corr!=lw: out.append('"%s" -> "%s"'%(words[lw],corr))
-    return out
+    import subprocess
+    blob='\n'.join(t for t in texts if t)
+    if not blob.strip(): return []
+    try:
+        r=subprocess.run(['hunspell','-d','es_ES','-l'],input=blob,capture_output=True,text=True,timeout=45)
+        bad=r.stdout.split()
+    except Exception:
+        return []
+    seen={}
+    for w in bad:
+        if len(w)<5 or w.isupper() or any(ch.isdigit() for ch in w): continue
+        lw=w.lower()
+        if lw in _WHITE or lw in _WHITE2: continue
+        seen.setdefault(lw,w)
+    return ['"%s"'%w for w in list(seen.values())[:20]]
 def _cells(f):
     vals=[]
     try:
