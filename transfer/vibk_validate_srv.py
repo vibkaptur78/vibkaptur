@@ -118,7 +118,7 @@ def pdf_resumen(pdf):
     return grades,nomed,(m.group(0) if m else None),txt
 import datetime as _dt
 _WHITE=set("""rms tag vibkaptur ingenor weylchem kronospan betanzos otua rodamiento rodamientos desequilibrio desequilibrios desalineacion desalineacion acoplamiento acoplamientos engrase engrases holgura holguras espectro espectros armonico armonicos cojinete cojinetes chumacera chumaceras impulsor impulsores rodete rodetes ventilador ventiladores soplante soplantes reductor reductora reductoras multiplicadora acelerometro termografia termografia vibraciones vibracion envolvente cinematica engranaje engranajes polea poleas correa correas oleum absorcion sulfurico demi azufre fusion reglaje severidad satisfactorio insatisfactorio atencion significativo cuadro cuadros estabilidad""".split())
-_WHITE2=set(u"acelerómetro acelerómetros termográfica termográficas videoscopía endoscopía holgura".split())
+_WHITE2=set(u"acelerómetro acelerómetros termográfica termográficas videoscopía endoscopía holgura hertzios hercios triaxial triaxiales ergometría ergometria rotacionales rotacional rotacionariamente desalineación desalineacion electromagnética electromagnetica report reporte espectral espectrales envolventes axial radial tangencial cinemático cinemáticos".split())
 def spell_findings(texts):
     import subprocess
     blob='\n'.join(t for t in texts if t)
