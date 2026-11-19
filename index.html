@@ -278,7 +278,7 @@ const CONTACTS_DEFAULT={
   ]
 };
 let CONTACTS=(function(){ try{const v=localStorage.getItem('ingenor_contacts'); if(v) return JSON.parse(v);}catch(e){} return JSON.parse(JSON.stringify(CONTACTS_DEFAULT)); })();
-let uploadCid='elis';
+let uploadCid='';
 const AVISO_TECNICOS=['tecnico1@ingenorsistemas.com','tecnico2@ingenorsistemas.com','tecnico3@ingenorsistemas.com','tecnico4@ingenorsistemas.com','pedro.ortega@ingenorsistemas.com'];
 const AVISO_CC=['administracion@ingenorsistemas.com'];
 /* Envío de avisos por correo. La API key de Brevo vive en el servidor (aviso.php), NUNCA aquí.
@@ -312,11 +312,13 @@ function fetchDlToken(email,password,remember){
   }catch(e){}
 }
 function doUpload(cid){
+  if(!upReady(cid)) return;
   var inp=document.getElementById('pdfFile');
   var st=document.getElementById('upStatus');
   function msg(t){ if(st)st.innerHTML=t; }
   if(!inp||!inp.files||!inp.files.length){ msg('Elige primero un archivo PDF.'); return; }
   var f=inp.files[0];
+  if(!upCheckNames(cid,inp.files)) return;
   if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
   if(f.size>30*1024*1024){ msg('El PDF es demasiado grande (máx. 30 MB).'); return; }
   msg('Subiendo <b>'+f.name+'</b>…');
@@ -327,6 +329,7 @@ function doUpload(cid){
   }).catch(function(){ msg('Error de conexión al subir el PDF.'); });
 }
 function doUploadWord(cid){
+  if(!upReady(cid)) return;
   var inp=document.getElementById('wordFile');
   var st=document.getElementById('upStatusW');
   function msg(t){ if(st)st.innerHTML=t; }
@@ -344,12 +347,14 @@ function doUploadWord(cid){
   }).catch(function(){ msg('Error de conexión al subir el Word.'); });
 }
 function doUploadFichas(cid){
+  if(!upReady(cid)) return;
   var inp=document.getElementById('fichasFiles');
   var st=document.getElementById('upStatusF');
   function msg(t){ if(st)st.innerHTML=t; }
   if(!inp||!inp.files||!inp.files.length){ msg('Elige primero las fichas (.xls).'); return; }
   if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
   var files=Array.prototype.slice.call(inp.files);
+  if(!upCheckNames(cid,files)) return;
   var okc=0, err=0, i=0;
   msg('Subiendo <b>'+files.length+'</b> fichas…');
   function next(){
@@ -365,6 +370,7 @@ function doUploadFichas(cid){
   next();
 }
 function doRevisar(cid){
+  if(!upReady(cid)) return;
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
   toast('Revisando el informe en el servidor…');
   fetch('/api/revisar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,p:upPlantId()})})
@@ -385,6 +391,41 @@ function doRevisar(cid){
        toast('No se pudo revisar: '+m);
      }
    }).catch(function(){ toast('Error de conexión al revisar.'); });
+}
+/* Seguridad al subir: destino siempre visible, planta obligatoria y aviso si los archivos parecen de otro cliente/planta */
+function upTok(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().split(' ').filter(function(w){return w.length>=4&&['PLANTA','INFORME','FOODS','NEXT','SISTEMAS','CHEMICAL'].indexOf(w)<0;}); }
+function upBanner(){
+  var e=document.getElementById('upDest'); if(!e) return;
+  var c=DATA.clients.find(function(x){return x.id===uploadCid;}); if(!c){ e.innerHTML=''; return; }
+  var multi=(c.plants||[]).length>1, pn=upPlantName();
+  e.innerHTML='Vas a subir a: <b style="font-size:17px">'+c.name+(multi?(' · '+(upPlantId()?pn:'<span style="color:#b45309">elige la planta</span>')):'')+'</b>';
+}
+function upReady(cid){
+  var c=DATA.clients.find(function(x){return x.id===cid;});
+  if(!c){ toast('Elige primero el cliente.'); return false; }
+  if((c.plants||[]).length>1 && !upPlantId()){ toast('Elige la planta de '+c.name+' antes de continuar.'); var e=document.getElementById('upPlanta'); if(e) e.focus(); return false; }
+  return true;
+}
+function upCheckNames(cid,files){
+  var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c||!files||!files.length) return true;
+  var names=[].map.call(files,function(f){return ' '+upTok(f.name.replace(/\.[a-z0-9]+$/i,'')).join(' ')+' ';}).join('|');
+  var has=function(tk){ return tk.some(function(w){return names.indexOf(' '+w+' ')>=0;}); };
+  var own=upTok(c.name).concat(upTok(c.id));
+  if(!has(own)){
+    var other=DATA.clients.filter(function(x){return x.id!==cid;}).filter(function(x){return has(upTok(x.name).concat(upTok(x.id)));})[0];
+    if(other && !confirm('⚠ Los archivos parecen de '+other.name+', pero vas a subirlos a '+c.name+'.\n\n¿Seguro que quieres continuar?')) return false;
+  }
+  if((c.plants||[]).length>1){
+    var pid=upPlantId(), mine=c.plants.filter(function(p){return p.id===pid;})[0];
+    var mt=mine?upTok(mine.name).concat(upTok(mine.id)):[];
+    var op=c.plants.filter(function(p){return p.id!==pid;}).filter(function(p){ var t=upTok(p.name).concat(upTok(p.id)).filter(function(w){return mt.indexOf(w)<0;}); return t.length&&has(t); })[0];
+    if(op){
+      var ownHit=mine&&has(mt.filter(function(w){return upTok(op.name).concat(upTok(op.id)).indexOf(w)<0;}));
+      if(!ownHit){ if(!confirm('⚠ Los archivos parecen de '+op.name+', pero has elegido '+(mine?mine.name:'otra planta')+'.\n\n¿Seguro que quieres continuar?')) return false; }
+      else if(!confirm('El nombre de los archivos menciona '+op.name+' y '+mine.name+'.\n\nSe van a subir a: '+mine.name+'.\n\n¿Es correcto?')) return false;
+    }
+  }
+  return true;
 }
 function upPlantId(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return e.value||'';}
 function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return (e.options[e.selectedIndex].text||'').trim();}
@@ -426,6 +467,7 @@ function buildClientSummaryEmail(cid,pl,dlUrl,statsUrl){
   return {html:html,subject:'Informe disponible · '+titulo+' · '+mes};
 }
 function doPublicar(cid,force){
+  if(!upReady(cid)) return;
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
   if(force && !confirm('¿Publicar el informe a pesar de los avisos de revisión? El cliente verá esta versión.')) return;
   toast(force?'Publicando (forzado)…':'Publicando…');
@@ -537,7 +579,7 @@ function plantTechs(plant){
 function findPlant(cid,pid){const c=DATA.clients.find(x=>x.id===cid);return c&&c.plants.find(p=>p.id===pid);}
 function findMachine(cid,pid,mid){const p=findPlant(cid,pid);if(!p)return null;for(const a of p.areas){const m=a.machines.find(x=>x.id===mid);if(m)return {...m,area:a.name};}return null;}
 function pill(s){return `<span class="pill ${STATES[s].pill}">${STATES[s].label}</span>`;}
-function go(v){if(v){if(v.cid)curClient=v.cid;else if(v.gid)curClient=v.gid;}view=v;render();window.scrollTo(0,0);}
+function go(v){if(v){if(v.cid)curClient=v.cid;else if(v.gid)curClient=v.gid; if(v.name==='upload'){ uploadCid=v.cid||''; uploadPid=v.pid||''; }}view=v;render();window.scrollTo(0,0);}
 
 /* ============================================================= LOGIN */
 function techIcon(k){
@@ -693,13 +735,13 @@ function renderHeader(){
        <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
        <a onclick="go({name:'dash',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='dash'?'active':''}">Análisis</a>
        <a onclick="go({name:'stats',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>
-       <a onclick="go({name:'upload'})" class="${view.name==='upload'?'active':''}">Subir informe</a>`
+       <a onclick="go({name:'upload',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='upload'?'active':''}">Subir informe</a>`
     : isAdmin
     ? `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Plantas</a>
        <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
        <a onclick="go({name:'dash',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='dash'?'active':''}">Análisis</a>
        <a onclick="go({name:'stats',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='stats'?'active':''}">Estadísticas</a>
-       <a onclick="go({name:'upload'})" class="${view.name==='upload'?'active':''}">Subir informe</a>
+       <a onclick="go({name:'upload',cid:'${view.cid||curClient||''}',pid:'${view.pid||''}'})" class="${view.name==='upload'?'active':''}">Subir informe</a>
        <a onclick="go({name:'users'})" class="${view.name==='users'?'active':''}">Clientes y accesos</a>`
     : `<a onclick="go({name:'plants'})" class="${view.name==='plants'?'active':''}">Mis plantas</a>
        <a onclick="go({name:'tecnicas'})" class="${view.name==='tecnicas'?'active':''}">Técnicas</a>
@@ -1536,14 +1578,25 @@ function renderMachine(){
 function renderUpload(){
   const cid=uploadCid; const cn=clientName(cid);
   const cl=DATA.clients.find(x=>x.id===cid);
-  if(cl&&!cl.plants.some(p=>p.id===uploadPid)) uploadPid=(cl.plants[0]&&cl.plants[0].id)||'';
-  const plantOpts=cl?cl.plants.map(p=>`<option value="${p.id}" ${p.id===uploadPid?'selected':''}>${p.name}</option>`).join(''):'';
+  if(!cl){
+    /* Sin cliente elegido: no se puede subir nada hasta escogerlo (evita subir a un cliente que no es) */
+    return `<main><div class="crumbs"><b>Subir informe</b></div><h1>Subir informe de inspección</h1>
+      <div class="card pad" style="max-width:560px;border-left:4px solid var(--g-alerta)"><b style="font-size:14px">¿De qué cliente es el informe?</b>
+      <p style="color:var(--muted);font-size:12.5px;margin:6px 0 12px">Elige el cliente antes de subir nada. Si entras a «Subir informe» desde la planta del cliente, ya viene elegido.</p>
+      <select onchange="setUploadCid(this.value)" style="width:100%;font-size:14px;padding:8px"><option value="">— Elige el cliente —</option>${DATA.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div></main>`;
+  }
+  const _multi=cl.plants.length>1;
+  if(!cl.plants.some(p=>p.id===uploadPid)) uploadPid=_multi?'':((cl.plants[0]&&cl.plants[0].id)||'');
+  const plantOpts=(_multi?`<option value="" ${uploadPid?'':'selected'}>— Elige la planta —</option>`:'')+cl.plants.map(p=>`<option value="${p.id}" ${p.id===uploadPid?'selected':''}>${p.name}</option>`).join('');
+  const _pSel=cl.plants.find(p=>p.id===uploadPid);
+  const _dest=`Vas a subir a: <b style="font-size:17px">${cl.name}${_multi?(' · '+(_pSel?_pSel.name:'<span style="color:#b45309">elige la planta</span>')):''}</b>`;
   const rec=CONTACTS[cid]||[];
   return `<main>
     <div class="crumbs"><b>Subir informe</b></div>
     <h1>Subir informe de inspección</h1>
     <p class="sub">El técnico sube <b>de una vez todo el informe</b> (todas las fichas + el PDF) y la plataforma lo <b>analiza solo</b>: detecta las máquinas, su severidad y el diagnóstico, y actualiza la planta.</p>
     ${adminBanner("Los técnicos entran con su usuario y solo pueden subir informes (no descargan). Los clientes nunca ven esta pantalla.")}
+    <div class="card pad" style="margin-bottom:14px;border-left:5px solid var(--navy);display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div id="upDest" style="font-size:13.5px">${_dest}</div><button class="btn ghost sm" onclick="setUploadCid('')">Cambiar de cliente</button></div>
     <div class="two-col">
       <div class="card pad">
         <b style="font-size:14px">1 · Sube el informe completo</b>
@@ -1567,7 +1620,7 @@ function renderUpload(){
       <div class="card pad">
         <b style="font-size:14px">2 · Destino y análisis automático</b>
         <div class="field" style="margin-top:12px"><label>Cliente</label><select onchange="setUploadCid(this.value)">${DATA.clients.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${c.name}</option>`).join('')}</select></div>
-        <div class="field"><label>Planta${cl&&cl.plants.length>1?' — las fichas y el PDF se guardan y revisan por planta':''}</label><select id="upPlanta" onchange="uploadPid=this.value">${plantOpts}</select></div>
+        <div class="field"><label>Planta${cl&&cl.plants.length>1?' — las fichas y el PDF se guardan y revisan por planta':''}</label><select id="upPlanta" onchange="uploadPid=this.value;upBanner()">${plantOpts}</select></div>
         <div class="field"><label>Técnica</label><select><option>Se detecta de las fichas (vibraciones / termografía)</option></select></div>
         <div style="background:#f6fafc;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;color:#2c4a63;line-height:1.6;margin:4px 0 12px">
           <b>La plataforma hará sola:</b><br>• Crear/actualizar cada máquina con su estado y grado<br>• Guardar la medida en el histórico y mostrar las <b>5 últimas</b> en las gráficas<br>• Pintar fenómenos, RMS, imágenes térmicas y diagnóstico<br>• Recalcular estadísticas, análisis y alarmas</div>
