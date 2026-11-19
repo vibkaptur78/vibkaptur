@@ -1841,7 +1841,7 @@ const SAV_COST={elis:2750,weylchem:5500,_default:2750};
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
 function savRisk(c,PL){
   if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
-  let annual=0,n=0,potential=0,npot=0,nmach=0,nan=0,nok=0,tri=0,ntri=0,y3min=9999; const visits={};
+  let annual=0,n=0,potential=0,npot=0,nmach=0,nan=0,nok=0,tri=0,ntri=0,y3min=9999,nmed=0,nfia=0; const visits={};
   var _allM=[]; (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){ if(m.tmax===undefined) _allM.push(m); });});}); var Y=yearOfSet(_allM);
   (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
     if(m.nomedido||m.placeholder) return;
@@ -1851,6 +1851,7 @@ function savRisk(c,PL){
     ys.inY.forEach(function(t){visits[t.l]=1; nan++; if(t.g<=2) nok++;});
     var now=(m.grade!=null?m.grade:(tr.length?tr[tr.length-1].g:0));
     if(now>=5){ potential+=savPf(now)*cost; npot++; }
+    if(m.grade!=null||tr.length){ nmed++; if(now<=4) nfia++; }
     var gs=(ys.base?[ys.base.g]:[]).concat(ys.inY.map(function(t){return t.g;}));
     if(gs.length<2) return;
     var peak=Math.max.apply(null,gs);
@@ -1861,7 +1862,7 @@ function savRisk(c,PL){
     if(g3.length>=2){ var pk3=Math.max.apply(null,g3); if(pk3>now){ tri+=(savPf(pk3)-savPf(now))*cost; ntri++; } in3.forEach(function(t){ var yy=Math.floor(qNum(t.l)/12); if(yy<y3min) y3min=yy; }); }
   });});});
   var nv=Object.keys(visits).length||1;
-  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),potential:Math.round(potential),nPot:npot,nVisits:nv,nCaught:n,cost:cost,nMach:nmach,anio:Y,nAn:nan,nOk:nok,tri:Math.round(tri),nTri:ntri,triDesde:(y3min<9999?y3min:Y),unaVisita:(Object.keys(visits).length<=1)};
+  return {annual:Math.round(annual),perVisit:Math.round(annual/nv),potential:Math.round(potential),nPot:npot,nVisits:nv,nCaught:n,cost:cost,nMach:nmach,anio:Y,nAn:nan,nOk:nok,tri:Math.round(tri),nTri:ntri,triDesde:(y3min<9999?y3min:Y),unaVisita:(Object.keys(visits).length<=1),nMed:nmed,nFia:nfia};
 }
 const SAV_ADV=[
  "<b>Seguridad del personal</b> — evita roturas con proyección de piezas, sobrecalentamientos e incendios cerca de los operarios.",
@@ -1907,6 +1908,13 @@ function savBlockHTML(c,PL){
      +((!showA&&!showP)?'':'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · acumulado desde enero de '+(S.anio||'')+'</div>')+'</div>'
    +'<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px">'+cards+'</div>'
    +'<p style="font-size:13px;color:#56687a;text-align:center;max-width:660px;margin:10px auto 0;line-height:1.6">'+note+'</p>'
+   /* Fiabilidad confirmada: el valor de saber que los equipos están bien (no solo de detectar fallos) */
+   +(S.nFia>0?('<div style="margin:22px auto 0;max-width:720px;background:#2f6f52;border-radius:16px;padding:22px 26px;text-align:center;color:#fff;break-inside:avoid">'
+     +'<div style="font-size:11px;letter-spacing:2.5px;font-weight:800;color:#bfe6cf;text-transform:uppercase">Fiabilidad confirmada</div>'
+     +'<div style="font-size:40px;font-weight:800;line-height:1.1;margin-top:6px;color:#fff">'+S.nFia+' '+(S.nFia===1?'equipo':'equipos')+'</div>'
+     +'<div style="font-size:12.5px;color:#d6efe0;margin-top:3px">'+(S.nFia===S.nMed?'el total de los analizados en la última inspección':('de '+S.nMed+' analizados en la última inspección'))+'</div>'
+     +'<p style="font-size:13.5px;line-height:1.65;color:#f1faf5;max-width:600px;margin:12px auto 0">Cada equipo verificado es una certeza: funciona dentro de los límites admisibles y puede seguir en servicio con plena confianza. Conocer el buen estado de su maquinaria es tan valioso como detectar un fallo.</p>'
+     +'</div>'):'')
    +'<div style="margin-top:22px"><b style="font-size:17px;color:#0d2d46">Más allá del ahorro económico</b>'
      +'<p style="font-size:13px;color:#8a98a6;margin:3px 0 12px">Lo que además se consigue al detectar estos fallos a tiempo:</p>'
      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:11px">'
