@@ -318,7 +318,6 @@ function doUpload(cid){
   function msg(t){ if(st)st.innerHTML=t; }
   if(!inp||!inp.files||!inp.files.length){ msg('Elige primero un archivo PDF.'); return; }
   var f=inp.files[0];
-  if(!upCheckNames(cid,inp.files)) return;
   if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
   if(f.size>30*1024*1024){ msg('El PDF es demasiado grande (máx. 30 MB).'); return; }
   msg('Subiendo <b>'+f.name+'</b>…');
@@ -354,7 +353,6 @@ function doUploadFichas(cid){
   if(!inp||!inp.files||!inp.files.length){ msg('Elige primero las fichas (.xls).'); return; }
   if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
   var files=Array.prototype.slice.call(inp.files);
-  if(!upCheckNames(cid,files)) return;
   var okc=0, err=0, i=0;
   msg('Subiendo <b>'+files.length+'</b> fichas…');
   function next(){
@@ -377,6 +375,9 @@ function doRevisar(cid){
    .then(function(r){return r.json();}).then(function(j){
      if(j&&j.ok){
        var txt=(j.n>0)?('Revisión hecha: '+j.n+' punto(s) a revisar.'):'✔ Revisión correcta, listo para publicar.';
+       var sosp=!!(j.destino&&j.destino.sospechoso);
+       if(sosp){ alert(upDestMsg(cid,j.destino)+'\n\nComprueba el cliente y la planta antes de publicar.'); txt='⚠ Posible cliente o planta equivocados. '+txt;
+         j.html='<div style="font-family:Arial,sans-serif;max-width:620px;background:#fff3dc;border:1px solid #f0c36d;border-radius:8px;padding:12px 16px;margin-bottom:12px;color:#7a4b00;font-size:13.5px"><b>⚠ Posible cliente o planta equivocados.</b><br>'+upDestMsg(cid,j.destino).replace(/^⚠ /,'').replace(/\n\n/g,'<br>')+'</div>'+(j.html||''); }
        if(j.html){
          var dest=[session.email,'pedro.ortega@ingenorsistemas.com'].filter(function(e,i,a){return e&&a.indexOf(e)===i;});
          var pl=upPlantName(); sendAviso({type:'client',to:dest,subject:(j.subject||'VIBKAPTUR - Revisión de informe')+(pl?(' · '+pl):''),html:pl?j.html.replace('subido a la plataforma.','subido a la plataforma — planta: <b>'+pl+'</b>.'):j.html}).then(function(res){
@@ -392,7 +393,7 @@ function doRevisar(cid){
      }
    }).catch(function(){ toast('Error de conexión al revisar.'); });
 }
-/* Seguridad al subir: destino siempre visible, planta obligatoria y aviso si los archivos parecen de otro cliente/planta */
+/* Seguridad al subir: destino siempre visible, planta obligatoria y la comprobación de que el contenido es de ese cliente la hace el servidor al revisar y al publicar */
 function upTok(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().split(' ').filter(function(w){return w.length>=4&&['PLANTA','INFORME','FOODS','NEXT','SISTEMAS','CHEMICAL'].indexOf(w)<0;}); }
 function upBanner(){
   var e=document.getElementById('upDest'); if(!e) return;
@@ -406,26 +407,12 @@ function upReady(cid){
   if((c.plants||[]).length>1 && !upPlantId()){ toast('Elige la planta de '+c.name+' antes de continuar.'); var e=document.getElementById('upPlanta'); if(e) e.focus(); return false; }
   return true;
 }
-function upCheckNames(cid,files){
-  var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c||!files||!files.length) return true;
-  var names=[].map.call(files,function(f){return ' '+upTok(f.name.replace(/\.[a-z0-9]+$/i,'')).join(' ')+' ';}).join('|');
-  var has=function(tk){ return tk.some(function(w){return names.indexOf(' '+w+' ')>=0;}); };
-  var own=upTok(c.name).concat(upTok(c.id));
-  if(!has(own)){
-    var other=DATA.clients.filter(function(x){return x.id!==cid;}).filter(function(x){return has(upTok(x.name).concat(upTok(x.id)));})[0];
-    if(other && !confirm('⚠ Los archivos parecen de '+other.name+', pero vas a subirlos a '+c.name+'.\n\n¿Seguro que quieres continuar?')) return false;
-  }
-  if((c.plants||[]).length>1){
-    var pid=upPlantId(), mine=c.plants.filter(function(p){return p.id===pid;})[0];
-    var mt=mine?upTok(mine.name).concat(upTok(mine.id)):[];
-    var op=c.plants.filter(function(p){return p.id!==pid;}).filter(function(p){ var t=upTok(p.name).concat(upTok(p.id)).filter(function(w){return mt.indexOf(w)<0;}); return t.length&&has(t); })[0];
-    if(op){
-      var ownHit=mine&&has(mt.filter(function(w){return upTok(op.name).concat(upTok(op.id)).indexOf(w)<0;}));
-      if(!ownHit){ if(!confirm('⚠ Los archivos parecen de '+op.name+', pero has elegido '+(mine?mine.name:'otra planta')+'.\n\n¿Seguro que quieres continuar?')) return false; }
-      else if(!confirm('El nombre de los archivos menciona '+op.name+' y '+mine.name+'.\n\nSe van a subir a: '+mine.name+'.\n\n¿Es correcto?')) return false;
-    }
-  }
-  return true;
+function upDestMsg(cid,d){
+  var cn=clientName(cid), pl=upPlantName(), dn=cn+(pl?(' · '+pl):'');
+  var m='⚠ Este informe no parece de '+dn+'.';
+  if(d&&d.total) m+='\n\nSolo '+(d.coinciden||0)+' de '+d.total+' fichas coinciden con máquinas de '+dn+'.';
+  if(d&&d.pdf_otro) m+='\n\nEl PDF nombra a: '+d.pdf_otro+'.';
+  return m;
 }
 function upPlantId(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return e.value||'';}
 function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return (e.options[e.selectedIndex].text||'').trim();}
@@ -466,12 +453,12 @@ function buildClientSummaryEmail(cid,pl,dlUrl,statsUrl){
     +'</table><div style="color:#94a3b8;font-size:11px;margin-top:14px">VIBKAPTUR · © Ingenor Sistemas 2026</div></td></tr></table>';
   return {html:html,subject:'Informe disponible · '+titulo+' · '+mes};
 }
-function doPublicar(cid,force){
+function doPublicar(cid,force,okDest){
   if(!upReady(cid)) return;
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
   if(force && !confirm('¿Publicar el informe a pesar de los avisos de revisión? El cliente verá esta versión.')) return;
   toast(force?'Publicando (forzado)…':'Publicando…');
-  fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0,p:upPlantId(),n:(session.name||session.email||'')})})
+  fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0,confirm:okDest?1:0,p:upPlantId(),n:(session.name||session.email||'')})})
    .then(function(r){return r.json();}).then(function(j){
      if(j&&j.ok){
        var cn=clientName(cid); var pl=upPlantName(); if(pl) cn=cn+' · '+pl;
@@ -501,6 +488,7 @@ function doPublicar(cid,force){
      }
      else {
        var e=(j&&j.e)||'error';
+       if(e==='otrocliente'){ if(confirm(upDestMsg(cid,j)+'\n\nNo se ha publicado nada.\n\n¿Quieres publicarlo de todos modos en '+clientName(cid)+(upPlantName()?(' · '+upPlantName()):'')+'?')) doPublicar(cid,force,true); else toast('No se ha publicado. Revisa el cliente y la planta elegidos.'); return; }
        var m={nopending:'No hay informe pendiente (sube primero el PDF).',move:'No se pudo mover el archivo.',noup:'Tu usuario no tiene permiso.'}[e]||e;
        toast('No se pudo publicar: '+m);
      }
