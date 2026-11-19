@@ -391,20 +391,26 @@ function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.option
 function buildClientSummaryEmail(cid,pl){
   var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c) return null;
   var plants=(c.plants||[]); if(pl){ var fp=plants.filter(function(p){return (p.name||'').trim()===pl;}); if(fp.length) plants=fp; }
-  var all=[]; plants.forEach(function(p){(p.areas||[]).forEach(function(a){(a.machines||[]).forEach(function(m){ if(!m.nomedido) all.push(Object.assign({area:a.name},m)); });});});
+  var all=[]; plants.forEach(function(p){(p.areas||[]).forEach(function(a){(a.machines||[]).forEach(function(m){ if(!m.nomedido&&!m.placeholder) all.push(Object.assign({area:a.name},m)); });});});
+  var vib=all.filter(function(m){return m.tmax===undefined;}); if(vib.length) all=vib; /* informe de vibraciones: no contar cuadros de termografía */
   if(!all.length) return null;
   var counts={bueno:0,seg:0,alerta:0,peligro:0}; all.forEach(function(m){ if(counts[m.state]!==undefined) counts[m.state]++; });
   var crit=all.filter(function(m){return (m.grade||0)>=5;}).sort(function(a,b){return b.grade-a.grade;});
+  if(!crit.length) crit=all.filter(function(m){return (m.grade||0)>=3;}).sort(function(a,b){return b.grade-a.grade;});
+  var FEN={}; all.forEach(function(m){ var seen={}; (m.fens||[]).forEach(function(f){ var g=f.grado||0; if(g<3) return; var k=String(f.f||'').split(' · ')[0].trim(); if(!k) return; if(!FEN[k]) FEN[k]={n:0,g:0,ms:[]}; if(!seen[k]){ seen[k]=1; FEN[k].n++; FEN[k].ms.push(m.name); } if(g>FEN[k].g) FEN[k].g=g; }); });
+  var fenL=Object.keys(FEN).map(function(k){return {k:k,n:FEN[k].n,g:FEN[k].g,ms:FEN[k].ms};}).sort(function(a,b){return (b.g-a.g)||(b.n-a.n);}).slice(0,5);
+  var mainFen=function(m){ var b=null; (m.fens||[]).forEach(function(f){ if(!b||(f.grado||0)>(b.grado||0)) b=f; }); return (b&&(b.grado||0)>=3)?String(b.f||''):''; };
   var cn=c.name+(pl?(' · '+pl):'');
   var mes=new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'});
   var chip=function(g){var col=g>=7?'#d23b3b':g>=5?'#e08a00':'#2f9e63';return '<span style="display:inline-block;min-width:30px;text-align:center;font-weight:800;color:#fff;background:'+col+';border-radius:6px;padding:2px 0;font-size:12px;margin-right:9px">'+g+'</span>';};
-  var rows=crit.slice(0,5).map(function(m){var r=m.rec||m.recomendacion||'';return '<div style="padding:6px 0;border-bottom:1px solid #eef2f6;font-size:12.5px">'+chip(m.grade)+'<b>'+m.area+' · '+m.name+'</b>'+(r?'<span style="color:#64748b"> — '+r+'</span>':'')+'</div>';}).join('') || '<div style="color:#2f9e63;font-size:13px;padding:6px 0">Todas las máquinas en buen estado ✔</div>';
+  var rows=crit.slice(0,5).map(function(m){var r=m.rec||m.recomendacion||'';var mf=mainFen(m);return '<div style="padding:6px 0;border-bottom:1px solid #eef2f6;font-size:12.5px">'+chip(m.grade)+'<b>'+m.area+' · '+m.name+'</b>'+(mf?'<span style="color:#334155"> · '+mf+'</span>':'')+(r?'<span style="color:#64748b"> — '+r+'</span>':'')+'</div>';}).join('') || '<div style="color:#2f9e63;font-size:13px;padding:6px 0">Todas las máquinas en buen estado ✔</div>';
   var pill=function(bg,col,t){return '<span style="display:inline-block;background:'+bg+';color:'+col+';font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:20px;margin:0 6px 6px 0">'+t+'</span>';};
   var html='<div style="font-family:Arial,sans-serif;max-width:560px;border:1px solid #dfe6ee;border-radius:10px;overflow:hidden"><div style="background:#0d2d46;color:#fff;padding:12px 16px"><b style="font-size:13.5px">Ingenor · Mantenimiento Predictivo</b></div><div style="padding:16px 18px;color:#333">'
     +'<p style="margin:0 0 4px;font-size:13.5px">Hola '+cn+',</p>'
     +'<p style="margin:0 0 11px;font-size:13px;color:#475569">Ya está disponible vuestro informe de <b>'+mes+'</b>. De un vistazo:</p>'
-    +'<div style="margin:0 0 8px">'+pill('#e8f3ec','#1f6b45',counts.bueno+' en buen estado')+pill('#fff3dc','#b06f00',counts.alerta+' en atención')+(counts.peligro?pill('#fce8e8','#d23b3b',counts.peligro+' en peligro'):'')+'</div>'
+    +'<div style="margin:0 0 8px">'+pill('#e8f3ec','#1f6b45',counts.bueno+' en buen estado')+(counts.seg?pill('#eaf1fb','#2b5c9e',counts.seg+' en seguimiento'):'')+pill('#fff3dc','#b06f00',counts.alerta+' en atención')+(counts.peligro?pill('#fce8e8','#d23b3b',counts.peligro+' en peligro'):'')+'</div>'
     +'<div style="font-weight:700;font-size:12px;color:#334155;margin:0 0 4px">Puntos a vigilar</div>'+rows
+    +(fenL.length?('<div style="font-weight:700;font-size:12px;color:#334155;margin:14px 0 4px">Fenómenos más significativos</div>'+fenL.map(function(f){return '<div style="padding:6px 0;border-bottom:1px solid #eef2f6;font-size:12.5px">'+chip(f.g)+'<b>'+f.k+'</b><span style="color:#64748b"> — '+f.n+(f.n===1?' máquina':' máquinas')+': '+f.ms.slice(0,4).join(', ')+(f.ms.length>4?'…':'')+'</span></div>';}).join('')):'')
     +'<div style="text-align:center;margin:16px 0 6px"><a href="https://vibkaptur.com" style="background:#2f9e63;color:#fff;padding:12px 26px;border-radius:9px;font-weight:800;display:inline-block;font-size:14px;text-decoration:none">⬇ Descargar informe completo (PDF)</a></div>'
     +'<p style="margin:10px 0 0;font-size:12px;color:#94a3b8;text-align:center">'+all.length+' máquinas revisadas</p>'
     +'<p style="margin:12px 0 0;font-size:13px">Un saludo,<br>Equipo Ingenor</p></div></div>';
