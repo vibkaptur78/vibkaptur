@@ -413,18 +413,24 @@ function doPublicar(cid,force){
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
   if(force && !confirm('¿Publicar el informe a pesar de los avisos de revisión? El cliente verá esta versión.')) return;
   toast(force?'Publicando (forzado)…':'Publicando…');
-  fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0})})
+  fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0,p:upPlantName(),n:(session.name||session.email||'')})})
    .then(function(r){return r.json();}).then(function(j){
      if(j&&j.ok){
        var cn=clientName(cid); var pl=upPlantName(); if(pl) cn=cn+' · '+pl;
        var dest=['pedro.ortega@ingenorsistemas.com']; /* fase de prueba: el resumen de publicación va solo a Pedro; después, a Pedro + cliente */
        var h='<div style="font-family:Arial,sans-serif;max-width:620px"><div style="background:#0d2d46;color:#fff;padding:14px 18px;font-weight:bold">INGENOR · VIBKAPTUR — Informe publicado</div><div style="padding:18px 20px;color:#333;font-size:13.5px;line-height:1.6"><p>Hola,</p><p>El informe de <b>'+cn+'</b> ha sido <b>publicado</b> en la plataforma por '+(session.email||'un técnico')+' y ya está disponible para el cliente.</p>'+(force?'<p style="color:#b45309"><b>Publicado igualmente:</b> se ha publicado sin esperar a corregir los avisos de la revisión.</p>':'<p>Publicado tras la revisión automática.</p>')+'<p style="color:#8a98a6;font-size:12px;margin:10px 0 0">— VIBKAPTUR · aviso automático</p></div></div>';
        var subj='VIBKAPTUR - Informe publicado: '+cn+(force?' (publicado igualmente)':'');
-       var RS=null; try{ RS=buildClientSummaryEmail(cid,pl); }catch(e){ RS=null; }
-       if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (fase de prueba: de momento solo lo recibe Pedro):</p>'+RS.html; }
-       sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
-         toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
-       });
+       var D=j.datos||null;
+       var dmsg=(D&&D.ok)?('Datos actualizados ('+D.periodo+'): '+D.actualizadas+' con ficha nueva, '+D.ok_sin_ficha+' OK sin ficha, '+D.no_medidas+' no medidas'+((D.nuevas&&D.nuevas.length)?(', '+D.nuevas.length+' nuevas'):'')+'.'):('⚠ Los datos de Análisis y Estadísticas NO se han actualizado'+(D&&D.e?(' (motivo: '+({multiplanta:'cliente con varias plantas, aún no automático',sinfichas:'no hay fichas subidas',sincambios:'ninguna ficha del mes coincide',planta:'planta no indicada',nodatos:'no hay datos previos del cliente'}[D.e]||D.e)+')'):'')+'.');
+       h=h+'<p style="font-family:Arial,sans-serif;font-size:12.5px;color:#334155;margin:10px 0">'+dmsg+'</p>';
+       var fin=function(){
+         var RS=null; try{ RS=buildClientSummaryEmail(cid,pl); }catch(e){ RS=null; }
+         if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (fase de prueba: de momento solo lo recibe Pedro):</p>'+RS.html; }
+         sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
+           toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+dmsg+' '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
+         });
+       };
+       if(D&&D.ok){ loadClientData(session.dlToken).then(fin).catch(fin); } else fin();
      }
      else {
        var e=(j&&j.e)||'error';
@@ -715,7 +721,11 @@ function renderPlant(){
   const insp0=(p.areas[0]&&p.areas[0].machines[0]&&p.areas[0].machines[0].insp)||META.medicion;
   const techsPresent=[]; p.areas.forEach(a=>a.machines.forEach(m=>(m.techs||[]).forEach(t=>{if(techsPresent.indexOf(t)<0)techsPresent.push(t);})));
   const termoMeta={servicio:"Termografía · cuadros eléctricos",medicion:insp0,tecnico:"Ingenor Sistemas",aprobado:"Pedro Ortega",equipos:"Cámara termográfica infrarroja (IR) · Software de termografía"};
-  const vibMeta={servicio:"Análisis de vibraciones",medicion:"24/09/2026",tecnico:"Ingenor Sistemas",aprobado:"Pedro Ortega",equipos:"Colector de vibraciones · Acelerómetros · Software VIB-KAPTUR"};
+  const _ML={ene:'enero',feb:'febrero',mar:'marzo',abr:'abril',may:'mayo',jun:'junio',jul:'julio',ago:'agosto',sep:'septiembre',oct:'octubre',nov:'noviembre',dic:'diciembre'};
+  const _MO=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  let _lastL='',_lastN=-1; p.areas.forEach(a=>a.machines.forEach(m=>{ if(m.nomedido||m.tmax!==undefined) return; const t=(m.trend||[]); if(!t.length) return; const l=String(t[t.length-1].l||''); const mm=l.match(/^([a-z]{3})-(\d{2})$/); if(!mm) return; const n=(+mm[2])*12+_MO.indexOf(mm[1]); if(n>_lastN){_lastN=n;_lastL=l;} }));
+  const _medVib=p.medicion||(_lastL?((_ML[_lastL.slice(0,3)]||_lastL.slice(0,3))+' 20'+_lastL.slice(4)):'—');
+  const vibMeta={servicio:"Análisis de vibraciones",medicion:_medVib,tecnico:(p.tecnico||"Ingenor Sistemas"),aprobado:"Pedro Ortega",equipos:"Colector de vibraciones · Acelerómetros · Software VIB-KAPTUR"};
   const meta=currentTech==='Vibraciones'?vibMeta:(isTermo?termoMeta:META);
   const _tOrd=['Vibraciones','Termografía','Ultrasonidos','Endoscopia','Análisis de aceite'];
   techsPresent.sort((a,b)=>{const ia=_tOrd.indexOf(a),ib=_tOrd.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
