@@ -1570,12 +1570,12 @@ function renderUpload(){
         <div class="field"><label>Planta${cl&&cl.plants.length>1?' — las fichas y el PDF se guardan y revisan por planta':''}</label><select id="upPlanta" onchange="uploadPid=this.value">${plantOpts}</select></div>
         <div class="field"><label>Técnica</label><select><option>Se detecta de las fichas (vibraciones / termografía)</option></select></div>
         <div style="background:#f6fafc;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;color:#2c4a63;line-height:1.6;margin:4px 0 12px">
-          <b>La plataforma hará sola:</b><br>• Crear/actualizar cada máquina con su estado y grado<br>• Guardar la medida y <b>quitar la 5ª más antigua</b> (ventana de 4)<br>• Pintar fenómenos, RMS, imágenes térmicas y diagnóstico<br>• Recalcular estadísticas, análisis y alarmas</div>
+          <b>La plataforma hará sola:</b><br>• Crear/actualizar cada máquina con su estado y grado<br>• Guardar la medida en el histórico y mostrar las <b>5 últimas</b> en las gráficas<br>• Pintar fenómenos, RMS, imágenes térmicas y diagnóstico<br>• Recalcular estadísticas, análisis y alarmas</div>
       </div>
     </div>
     <div class="card pad" style="margin-top:14px;border-left:4px solid var(--steel)">
       <b style="font-size:14px">2.5 · Revisión automática antes de publicar</b>
-      <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de publicar, la plataforma comprueba <b>solo dos cosas</b>: (1) <b>ortografía</b> y (2) que los <b>valores y grados</b> cargados <b>coincidan con la ficha (Excel) y el resumen del PDF</b> (errores de transcripción). <b>No valora el análisis ni el diagnóstico</b> — eso es criterio del técnico. Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, a <b>los técnicos y a Pedro</b>, con copia a <b>${AVISO_CC.join(' y ')}</b>. Tú das el OK y entonces se publica.</p>
+      <p style="margin:6px 0 10px;color:#2c4a63;font-size:12.5px;line-height:1.65">Antes de publicar, la plataforma comprueba <b>solo dos cosas</b>: (1) <b>ortografía</b> y (2) que los <b>valores y grados</b> cargados <b>coincidan con la ficha (Excel) y el resumen del PDF</b> (errores de transcripción). <b>No valora el análisis ni el diagnóstico</b> — eso es criterio del técnico. Te llega un <b>aviso por correo</b> con lo corregido y lo que debes revisar, al <b>técnico que sube el informe y a Pedro</b>. Tú das el OK y entonces se publica.</p>
       <button class="btn" onclick="doRevisar('${cid}')" style="background:var(--green)">✓ Revisar informe ahora</button>
       <button class="btn ghost" onclick="openReviewAviso()" style="margin-left:8px">Ver ejemplo de aviso →</button>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
