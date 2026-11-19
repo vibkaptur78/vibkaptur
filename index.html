@@ -307,7 +307,7 @@ function fetchDlToken(email,password,remember){
   try{
     fetch('/api/token.php',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:email,password:password})})
       .then(function(r){return r.json();})
-      .then(function(j){ if(j&&j.ok&&session){ session.dlToken=j.token; try{ if(remember!==false) localStorage.setItem('vibk_session',JSON.stringify(session)); }catch(e){} } })
+      .then(function(j){ if(j&&j.ok&&session){ session.dlToken=j.token; setTimeout(tryPendingDL,300); try{ if(remember!==false) localStorage.setItem('vibk_session',JSON.stringify(session)); }catch(e){} } })
       .catch(function(){});
   }catch(e){}
 }
@@ -410,7 +410,7 @@ function buildClientSummaryEmail(cid,pl){
     +'<p style="margin:0 0 11px;font-size:13px;color:#475569">Ya está disponible vuestro informe de <b>'+mes+'</b>. De un vistazo:</p>'
     +'<div style="margin:0 0 8px">'+pill('#e8f3ec','#1f6b45',counts.bueno+' en buen estado')+(counts.seg?pill('#eaf1fb','#2b5c9e',counts.seg+' en seguimiento'):'')+pill('#fff3dc','#b06f00',counts.alerta+' en atención')+(counts.peligro?pill('#fce8e8','#d23b3b',counts.peligro+' en peligro'):'')+'</div>'
     +'<div style="font-weight:700;font-size:12px;color:#334155;margin:0 0 4px">Puntos a vigilar</div>'+rows
-    +'<div style="text-align:center;margin:16px 0 6px"><a href="https://vibkaptur.com" style="background:#2f9e63;color:#fff;padding:12px 26px;border-radius:9px;font-weight:800;display:inline-block;font-size:14px;text-decoration:none">⬇ Descargar informe completo (PDF)</a></div>'
+    +'<div style="text-align:center;margin:16px 0 6px"><a href="https://vibkaptur.com/?dl='+encodeURIComponent(cid)+((pl&&plants.length===1&&plants[0].id&&(c.plants||[]).length>1)?('&p='+encodeURIComponent(plants[0].id)):'')+'" style="background:#2f9e63;color:#fff;padding:12px 26px;border-radius:9px;font-weight:800;display:inline-block;font-size:14px;text-decoration:none">⬇ Descargar informe completo (PDF)</a></div>'
     +'<p style="margin:10px 0 0;font-size:12px;color:#94a3b8;text-align:center">'+all.length+' máquinas revisadas</p>'
     +'<p style="margin:12px 0 0;font-size:13px">Un saludo,<br>Equipo Ingenor</p></div></div>';
   return {html:html,subject:'Informe de vibraciones · '+cn+' · '+counts.peligro+' crítica(s) y '+counts.alerta+' a vigilar'};
@@ -455,12 +455,23 @@ function reportFilename(cid){
   var per=''; if(qs.length){ qs.sort(function(a,b){return qNum(b)-qNum(a);}); per='_'+perShort(qs[0]); }
   return 'Informe_'+cn+'_'+tech+per+'.pdf';
 }
+var PENDING_DL=(function(){ try{ var q=new URLSearchParams(location.search); var d=q.get('dl'); return d?{c:d.toLowerCase().replace(/[^a-z0-9_-]/g,''),p:(q.get('p')||'').toLowerCase().replace(/[^a-z0-9_-]/g,'')}:null; }catch(e){ return null; } })();
+var DL_OVR=null;
+/* Enlace del correo (?dl=cliente): al entrar, la descarga del informe arranca sola */
+function tryPendingDL(){
+  if(!PENDING_DL||!session||!session.dlToken) return;
+  var P=PENDING_DL; PENDING_DL=null;
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  if(session.canDownload===false) return;
+  DL_OVR=P; setTimeout(doDownload,500);
+}
 function doDownload(){
+  var OV=DL_OVR; DL_OVR=null;
   if(session&&session.canDownload===false){ toast('La descarga del informe es exclusiva del cliente y de administración.'); return; }
-  var c=(session&&session.role==='client')?session.clientId:((view&&view.cid)||curClient||(session&&session.clientId)||'elis');
+  var c=(session&&session.role==='client')?session.clientId:((OV&&OV.c)||(view&&view.cid)||curClient||(session&&session.clientId)||'elis');
   if(!(session&&session.dlToken)){ toast('Preparando la descarga… espera un segundo y vuelve a pulsar.'); return; }
   if(session.role==='client') recordDownload(session.clientId, session.name+(session.plantName?(' · '+session.plantName.replace('Planta ','')):(' · '+(session.puesto||''))));
-  var pl=(session&&session.plantId)||((view&&view.pid)||'');
+  var pl=(session&&session.plantId)||(OV?OV.p:((view&&view.pid)||''));
   var url='/api/informe.php?c='+encodeURIComponent(c)+'&t='+encodeURIComponent(session.dlToken)+(pl?('&p='+encodeURIComponent(pl)):'');
   var fname=reportFilename(c);
   fetch(url).then(function(r){ if(!r.ok) throw new Error('nd'); return r.blob(); }).then(function(b){
@@ -613,6 +624,7 @@ function doLogin(){
       return loadClientData(j.token).then(function(){
         startSession(u, remember);
         session.dlToken=j.token;
+        setTimeout(tryPendingDL,300);
         if(remember!==false){ try{localStorage.setItem('vibk_session',JSON.stringify(session));}catch(e){} }
         if(btn){btn.disabled=false;btn.textContent='Entrar';}
       }).catch(function(){ fail('No se pudieron cargar los datos. Reintenta.'); });
@@ -2135,7 +2147,7 @@ function render(){
 }
 // Arranque: si hay sesión recordada, cargar sus datos del servidor antes de pintar
 if(session && session.dlToken){
-  loadClientData(session.dlToken).then(function(){ render(); })
+  loadClientData(session.dlToken).then(function(){ render(); tryPendingDL(); })
     .catch(function(){ try{localStorage.removeItem('vibk_session');}catch(e){} session=null; render(); });
 } else { render(); }
 </script>
