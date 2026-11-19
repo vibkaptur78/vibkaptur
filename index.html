@@ -1836,7 +1836,8 @@ function savImproved(m){var g=savHistG(m);return g.length>=2&&g[g.length-1]<g[g.
 function savTempImproved(m){var h=m.evo||[],r=[];h.forEach(function(x){if(x.t!=null)r.push(x.t);});return r.length>=2&&r[r.length-1]<r[r.length-2];}
 function savY(x){return (x||'').indexOf('26')>=0;}
 /* ===== Modelo de ahorro por RIESGO EVITADO (aprobado): reduccion de prob. de fallo x coste, 12 meses ===== */
-const SAV_PF={0:0,1:0,2:0.03,3:0.08,4:0.15,5:0.30,6:0.45,7:0.65,8:0.80,9:0.90,10:0.95};
+/* Baremo de probabilidad de fallo por grado de severidad (criterio de Ingenor, fijado por Pedro el 19/11/2026) */
+const SAV_PF={0:0,1:0,2:0.02,3:0.10,4:0.30,5:0.60,6:0.80,7:0.92,8:0.99,9:1,10:1};
 const SAV_COST={elis:2750,weylchem:5500,_default:2750};
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
 function savRisk(c,PL){
@@ -1904,7 +1905,7 @@ function savBlockHTML(c,PL){
   var ex=function(t,d){return '<div style="padding:7px 0;border-bottom:1px solid #eef2f6;font-size:12.8px;line-height:1.55;color:#475569"><b style="color:#0d2d46">'+t+'.</b> '+d+'</div>';};
   return '<div style="border:1px solid #e6ecf2;border-radius:14px;padding:24px 20px;margin-top:18px;break-inside:avoid;background:#fafcfe">'
    +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">Valor del mantenimiento predictivo</b>'
-     +'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte)</div></div>'
+     +'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación de Ingenor según la severidad de cada equipo y su experiencia en diagnóstico</div></div>'
    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin:18px 0 14px">'+c1+c2+c3+c4+'</div>'
    /* Solo se explica la fiabilidad confirmada, en grande: las otras tres tarjetas se entienden por su título */
    +'<div style="max-width:780px;margin:6px auto 0;background:#eef7f1;border:1px solid #cfe7d8;border-left:6px solid #2f6f52;border-radius:12px;padding:20px 24px;break-inside:avoid">'
