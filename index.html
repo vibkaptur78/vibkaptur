@@ -604,6 +604,24 @@ function startSession(u, remember){
   openAreas={}; currentTech="Global";
   go({name:"plants"});
 }
+/* Homogeneidad: en todas las gráficas (fenómenos y tendencias) se muestran las últimas HIST_N mediciones de cada máquina.
+   El histórico completo sigue guardado en el servidor; aquí solo se recorta lo que se pinta. */
+var HIST_N=5;
+function trimHistory(clients){
+  (clients||[]).forEach(function(c){ (c.plants||[]).forEach(function(p){ (p.areas||[]).forEach(function(a){ (a.machines||[]).forEach(function(m){
+    if(!m||m.tmax!==undefined) return;
+    var last=function(arr){ return Array.isArray(arr)?arr.slice(-HIST_N):arr; };
+    if(Array.isArray(m.trend)&&m.trend.length){
+      var keep={}; m.trend=m.trend.slice(-HIST_N); m.trend.forEach(function(t){ keep[t.l]=1; });
+      var byk=function(arr,k){ if(!Array.isArray(arr)) return arr; var f=arr.filter(function(x){return keep[x[k]];}); return f.length?f:arr.slice(-HIST_N); };
+      m.evo=byk(m.evo,'q'); m.rms=byk(m.rms,'l');
+      (m.comps||[]).forEach(function(cp){ cp.series=byk(cp.series,'d'); });
+    } else {
+      m.evo=last(m.evo); m.rms=last(m.rms); (m.comps||[]).forEach(function(cp){ cp.series=last(cp.series); });
+    }
+    m.edates=last(m.edates);
+  }); }); }); });
+}
 function loadClientData(token){
   return fetch('/api/datos.php?t='+encodeURIComponent(token))
     .then(function(r){return r.json();})
@@ -612,6 +630,7 @@ function loadClientData(token){
       DATA.clients=[];
       if(dd.data.elis) DATA.clients.push(dd.data.elis);
       Object.keys(dd.data).forEach(function(k){ if(k!=='elis') DATA.clients.push(dd.data[k]); });
+      trimHistory(DATA.clients);
       return true;
     });
 }
