@@ -1236,7 +1236,7 @@ function generarInforme(opts){
       </div>
       <div style="font-weight:800;font-size:15px;color:#0d2d46;margin-bottom:10px">Detalle por planta y técnica</div>
       ${bloquesHTML}
-      ${savBlockHTML(c)}
+      ${savBlockHTML(c,PL)}
       <div style="font-weight:800;font-size:15px;color:#0d2d46;margin:6px 0 8px">Conclusión</div>
       <p style="font-size:12.8px;color:#334155;line-height:1.7;margin:0 0 20px">${concl}</p>
       <div style="border-top:1px solid #e6ecf2;padding-top:12px;font-size:11px;color:#8a98a6;display:flex;justify-content:space-between">
@@ -1288,7 +1288,7 @@ function renderOtuaView(mode){
     if(vib.length){const B=bundle(vib,'vib');out+= mode==='stats'?statsBlockEl('Vibraciones','Análisis de vibraciones · '+p.name,B,c.id,p.id):dashBlockEl('Vibraciones','Análisis de vibraciones · '+p.name,B,vib,c.id,p.id);}
     if(ter.length){const B=bundle(ter,'termo');out+= mode==='stats'?statsBlockEl('Termografía','Termografía de cuadros · '+p.name,B,c.id,p.id):dashBlockEl('Termografía','Termografía de cuadros · '+p.name,B,ter,c.id,p.id);}
   });
-  if(mode==='stats') out+=savBlockHTML(c);
+  if(mode==='stats') out+=savBlockHTML(c,plants);
   out+=`</main>`; return out;
 }
 
@@ -1827,10 +1827,10 @@ function savY(x){return (x||'').indexOf('26')>=0;}
 const SAV_PF={0:0,1:0,2:0.03,3:0.08,4:0.15,5:0.30,6:0.45,7:0.65,8:0.80,9:0.90,10:0.95};
 const SAV_COST={elis:2750,weylchem:5500,_default:2750};
 function savPf(g){g=Math.round(g||0);return SAV_PF[Math.max(0,Math.min(10,g))];}
-function savRisk(c){
+function savRisk(c,PL){
   if(!c) return null; const cost=SAV_COST[c.id]||SAV_COST._default; if(!cost) return null;
   let annual=0,n=0,potential=0,npot=0; const visits={};
-  scopedPlants(c).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
+  (PL||scopedPlants(c)).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
     if(m.nomedido) return;
     var tr=(m.trend||[]).filter(function(t){return t.g!=null;});
     tr.forEach(function(t){visits[t.l]=1;});
@@ -1857,20 +1857,23 @@ const SAV_ADV=[
  "<b>Menor impacto ambiental</b>: evita fugas, vertidos y consumo innecesario.",
  "<b>Trazabilidad</b>: el histórico respalda decisiones de mantenimiento e inversión."
 ];
-function savBlockHTML(c){
-  var S=savRisk(c); if(!S) return '';
+function savBlockHTML(c,PL){
+  var S=savRisk(c,PL); if(!S) return '';
   var showA=S.annual>=5000, showP=S.potential>0;
-  if(!showA && !showP) return '';
+  var showM=(!showA && !showP && S.nCaught>0);  /* plantas pequeñas: hay mejoras reales aunque el importe no llegue al mínimo que se muestra */
+  if(!showA && !showP && !showM) return '';
   var annualCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+eur(S.annual)+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">ahorro anual estimado</div></div>';
   var potCard='<div style="text-align:center;background:#fff6e9;border:1px solid #f0d9ac;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#b06f00;line-height:1">'+eur(S.potential)+'</div><div style="font-size:14px;color:#8a6410;margin-top:7px;font-weight:600">fallo potencial detectado</div><div style="font-size:11px;color:#b08a4a;margin-top:2px">'+S.nPot+' equipo(s) en riesgo, vigilados a tiempo</div></div>';
-  var cards=(showA?annualCard:'')+(showP?potCard:'');
+  var mejCard='<div style="text-align:center;background:#e8f3ec;border:1px solid #cfe7d8;border-radius:16px;padding:22px 34px;min-width:210px"><div style="font-size:42px;font-weight:800;color:#2f6f52;line-height:1">'+S.nCaught+'</div><div style="font-size:14px;color:#1f6f47;margin-top:7px;font-weight:600">'+(S.nCaught===1?'equipo ha reducido su severidad':'equipos han reducido su severidad')+'</div></div>';
+  var cards=(showA?annualCard:'')+(showP?potCard:'')+(showM?mejCard:'');
   var heading= showA?'Ahorro estimado por el mantenimiento predictivo':'Valor del mantenimiento predictivo en esta planta';
   var note= showA
      ? (S.nCaught+' equipos con fallo detectado a tiempo y corregido. Método: por cada equipo, reducción de la probabilidad de fallo (según su grado de severidad) × coste de una parada no planificada.')
+     : showM ? (S.nCaught+' equipo(s) con un defecto detectado a tiempo que han bajado de severidad tras la actuación de mantenimiento. Ningún equipo se encuentra ahora en nivel de alerta.')
      : (S.nPot+' equipo(s) en riesgo detectados y vigilados a tiempo, antes de que provoquen una parada. El importe refleja el coste potencial evitable si se dejaran degradar.');
   return '<div style="border:1px solid #e6ecf2;border-radius:14px;padding:24px 20px;margin-top:18px;break-inside:avoid;background:#fafcfe">'
    +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">'+heading+'</b>'
-     +'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · últimos 12 meses</div></div>'
+     +(showM?'':'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte) · últimos 12 meses</div>')+'</div>'
    +'<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px">'+cards+'</div>'
    +'<p style="font-size:13px;color:#56687a;text-align:center;max-width:660px;margin:10px auto 0;line-height:1.6">'+note+'</p>'
    +'<div style="margin-top:22px"><b style="font-size:17px;color:#0d2d46">Más allá del ahorro económico</b>'
