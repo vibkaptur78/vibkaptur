@@ -320,7 +320,7 @@ function doUpload(cid){
   if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
   if(f.size>30*1024*1024){ msg('El PDF es demasiado grande (máx. 30 MB).'); return; }
   msg('Subiendo <b>'+f.name+'</b>…');
-  var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('pdf',f);
+  var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('p',upPlantId()); fd.append('pdf',f);
   fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
     if(j&&j.ok){ msg('✅ Informe subido y <b>retenido</b> ('+Math.round(j.bytes/1024)+' KB). Sube las fichas (si faltan), pulsa <b>Revisar informe</b> y luego publica.'); }
     else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que tengas permiso de subida y que sea un PDF.'); }
@@ -336,7 +336,7 @@ function doUploadWord(cid){
   if(!/\.docx$/i.test(f.name)){ msg('El archivo debe ser un Word <b>.docx</b>.'); return; }
   if(f.size>40*1024*1024){ msg('El Word es demasiado grande (máx. 40 MB).'); return; }
   msg('Subiendo <b>'+f.name+'</b>…');
-  var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('file',f);
+  var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('p',upPlantId()); fd.append('file',f);
   fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
     if(j&&j.ok&&j.kind==='docx'){ msg('✅ Word recibido ('+Math.round(j.bytes/1024)+' KB). Queda <b>pendiente de procesar</b>: se revisa ortografía y congruencia, se extraen las fotos y se montan los cuadros en la planta.'); }
     else if(j&&j.ok){ msg('Subido, pero no se reconoció como Word (.docx).'); }
@@ -355,7 +355,7 @@ function doUploadFichas(cid){
   function next(){
     if(i>=files.length){ msg('✅ <b>'+okc+'</b> fichas subidas'+(err?(' · '+err+' con error'):'')+'. Ahora sube el PDF y pulsa «Revisar informe».'); return; }
     var f=files[i++];
-    var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('ficha',f);
+    var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('p',upPlantId()); fd.append('ficha',f);
     fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
       if(j&&j.ok) okc++; else err++;
       msg('Subiendo… '+(okc+err)+'/'+files.length);
@@ -367,7 +367,7 @@ function doUploadFichas(cid){
 function doRevisar(cid){
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
   toast('Revisando el informe en el servidor…');
-  fetch('/api/revisar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid})})
+  fetch('/api/revisar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,p:upPlantId()})})
    .then(function(r){return r.json();}).then(function(j){
      if(j&&j.ok){
        var txt=(j.n>0)?('Revisión hecha: '+j.n+' punto(s) a revisar.'):'✔ Revisión correcta, listo para publicar.';
@@ -386,6 +386,7 @@ function doRevisar(cid){
      }
    }).catch(function(){ toast('Error de conexión al revisar.'); });
 }
+function upPlantId(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return e.value||'';}
 function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return (e.options[e.selectedIndex].text||'').trim();}
 function buildClientSummaryEmail(cid,pl){
   var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c) return null;
@@ -413,7 +414,7 @@ function doPublicar(cid,force){
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
   if(force && !confirm('¿Publicar el informe a pesar de los avisos de revisión? El cliente verá esta versión.')) return;
   toast(force?'Publicando (forzado)…':'Publicando…');
-  fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0,p:upPlantName(),n:(session.name||session.email||'')})})
+  fetch('/api/publicar.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,force:force?1:0,p:upPlantId(),n:(session.name||session.email||'')})})
    .then(function(r){return r.json();}).then(function(j){
      if(j&&j.ok){
        var cn=clientName(cid); var pl=upPlantName(); if(pl) cn=cn+' · '+pl;
@@ -462,7 +463,8 @@ function doDownload(){
   }).catch(function(){ toast('Informe no disponible todavía para esta planta.'); });
 }
 function clientName(cid){const c=DATA.clients.find(x=>x.id===cid);return c?c.name:cid;}
-function setUploadCid(v){uploadCid=v;render();}
+var uploadPid='';
+function setUploadCid(v){uploadCid=v;uploadPid='';render();}
 function addContact(cid){ (CONTACTS[cid]=CONTACTS[cid]||[]).push({n:'',e:'',r:'Destinatario'}); saveContacts(); render(); }
 function rmContact(cid,i){ CONTACTS[cid].splice(i,1); saveContacts(); render(); }
 function setContact(cid,i,k,v){ CONTACTS[cid][i][k]=v; saveContacts(); }
@@ -1458,7 +1460,8 @@ function renderMachine(){
 function renderUpload(){
   const cid=uploadCid; const cn=clientName(cid);
   const cl=DATA.clients.find(x=>x.id===cid);
-  const plantOpts=cl?cl.plants.map(p=>`<option>${p.name}</option>`).join(''):'';
+  if(cl&&!cl.plants.some(p=>p.id===uploadPid)) uploadPid=(cl.plants[0]&&cl.plants[0].id)||'';
+  const plantOpts=cl?cl.plants.map(p=>`<option value="${p.id}" ${p.id===uploadPid?'selected':''}>${p.name}</option>`).join(''):'';
   const rec=CONTACTS[cid]||[];
   return `<main>
     <div class="crumbs"><b>Subir informe</b></div>
@@ -1488,7 +1491,7 @@ function renderUpload(){
       <div class="card pad">
         <b style="font-size:14px">2 · Destino y análisis automático</b>
         <div class="field" style="margin-top:12px"><label>Cliente</label><select onchange="setUploadCid(this.value)">${DATA.clients.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${c.name}</option>`).join('')}</select></div>
-        <div class="field"><label>Planta</label><select id="upPlanta">${plantOpts}</select></div>
+        <div class="field"><label>Planta${cl&&cl.plants.length>1?' — las fichas y el PDF se guardan y revisan por planta':''}</label><select id="upPlanta" onchange="uploadPid=this.value">${plantOpts}</select></div>
         <div class="field"><label>Técnica</label><select><option>Se detecta de las fichas (vibraciones / termografía)</option></select></div>
         <div style="background:#f6fafc;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;color:#2c4a63;line-height:1.6;margin:4px 0 12px">
           <b>La plataforma hará sola:</b><br>• Crear/actualizar cada máquina con su estado y grado<br>• Guardar la medida y <b>quitar la 5ª más antigua</b> (ventana de 4)<br>• Pintar fenómenos, RMS, imágenes térmicas y diagnóstico<br>• Recalcular estadísticas, análisis y alarmas</div>
