@@ -1882,9 +1882,8 @@ function savBlockHTML(c,PL){
   /* Bloque de valor: SIEMPRE cuatro tarjetas (formato fijado por Pedro) y debajo la explicación de cada una.
      1 Ahorro anual estimado · 2 Ahorro trianual estimado · 3 Fallo potencial detectado · 4 Fiabilidad confirmada */
   var S=savRisk(c,PL); if(!S||!S.nMach) return '';
-  /* Mínimo para enseñar un importe: 5.000 € en general; en plantas con pocas máquinas, 600 € por máquina */
-  var minA=Math.min(5000,600*S.nMach);
-  var showA=S.annual>0 && S.annual>=minA, showT=S.tri>0 && S.tri>=minA, showP=S.potential>0;
+  /* Los importes se muestran SIEMPRE en euros (criterio de Pedro), aunque sean pequeños o cero */
+  var showP=S.potential>0;
   var E=function(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+' €'; };
   var U=function(n){ return n+' '+(n===1?'equipo':'equipos'); };
   var G={bg:'#e8f3ec',bd:'#cfe7d8',c1:'#2f6f52',c2:'#1f6f47',c3:'#5f8f76'}, A={bg:'#fff6e9',bd:'#f0d9ac',c1:'#b06f00',c2:'#8a6410',c3:'#b08a4a'}, N={bg:'#f3f6f9',bd:'#dfe6ee',c1:'#64748b',c2:'#64748b',c3:'#8a98a6'};
@@ -1897,12 +1896,8 @@ function savBlockHTML(c,PL){
   };
   var perA=S.unaVisita?('de la inspección anterior a la de '+S.anio):('acumulado en '+S.anio);
   var perT=(S.triDesde<S.anio)?(S.triDesde+'–'+S.anio):('histórico disponible: '+S.anio);
-  var c1= showA ? card('Ahorro anual estimado',E(S.annual),S.nCaught+' equipo(s) corregidos · '+perA,G)
-        : (S.nCaught>0 ? card('Ahorro anual estimado',U(S.nCaught),'han reducido su severidad · '+perA,G)
-                       : card('Ahorro anual estimado','—','sin cambios de severidad · '+perA,N));
-  var c2= showT ? card('Ahorro trianual estimado',E(S.tri),S.nTri+' equipo(s) corregidos · '+perT,G)
-        : (S.nTri>0 ? card('Ahorro trianual estimado',U(S.nTri),'han reducido su severidad · '+perT,G)
-                    : card('Ahorro trianual estimado','—','sin cambios de severidad · '+perT,N));
+  var c1= card('Ahorro anual estimado',E(S.annual),(S.nCaught>0?(S.nCaught+' equipo(s) corregidos'):'sin cambios de severidad')+' · '+perA,(S.annual>0?G:N));
+  var c2= card('Ahorro trianual estimado',E(S.tri),(S.nTri>0?(S.nTri+' equipo(s) corregidos'):'sin cambios de severidad')+' · '+perT,(S.tri>0?G:N));
   var c3= showP ? card('Fallo potencial detectado',E(S.potential),U(S.nPot)+' en riesgo, vigilados a tiempo',A)
                 : card('Fallo potencial detectado','Sin fallos','en la última inspección no se detectan fallos severos',G);
   var c4= card('Fiabilidad confirmada',U(S.nFia),(S.nFia===S.nMed?'el total de los analizados':('de '+S.nMed+' analizados'))+' en la última inspección',G,true);
@@ -1911,11 +1906,10 @@ function savBlockHTML(c,PL){
    +'<div style="text-align:center;margin-bottom:4px"><b style="font-size:19px;color:#0d2d46">Valor del mantenimiento predictivo</b>'
      +'<div style="font-size:12px;color:#8a98a6;margin-top:3px">estimación según literatura de referencia (DOE/PNNL, McKinsey, Deloitte)</div></div>'
    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin:18px 0 14px">'+c1+c2+c3+c4+'</div>'
-   +'<div style="max-width:760px;margin:0 auto">'
-     +ex('Ahorro anual estimado','Coste de averías evitado '+(S.unaVisita?'entre la inspección anterior y la última':'desde enero del año en curso')+': equipos cuyo defecto se detectó a tiempo y ya han reducido su severidad. Se calcula como reducción de la probabilidad de fallo × coste de una parada no planificada.')
-     +ex('Ahorro trianual estimado','El mismo cálculo acumulado sobre los tres últimos años, para ver el efecto sostenido del seguimiento.')
-     +ex('Fallo potencial detectado','Coste que supondría la avería de los equipos que hoy están en alerta si se dejaran degradar. Es la situación en la última inspección: lo que se está a tiempo de evitar.')
-     +ex('Fiabilidad confirmada','Equipos verificados que funcionan dentro de los límites admisibles y pueden seguir en servicio con plena confianza. Conocer el buen estado de la maquinaria es tan valioso como detectar un fallo.')
+   /* Solo se explica la fiabilidad confirmada, en grande: las otras tres tarjetas se entienden por su título */
+   +'<div style="max-width:780px;margin:6px auto 0;background:#eef7f1;border:1px solid #cfe7d8;border-left:6px solid #2f6f52;border-radius:12px;padding:20px 24px;break-inside:avoid">'
+     +'<div style="font-size:19px;font-weight:800;color:#1f5a41;margin-bottom:6px">Fiabilidad confirmada: '+U(S.nFia)+(S.nFia===S.nMed?'':(' de '+S.nMed))+'</div>'
+     +'<p style="font-size:16px;line-height:1.65;color:#24473a;margin:0">Son los equipos verificados que funcionan dentro de los límites admisibles y pueden seguir en servicio con plena confianza. <b>Conocer el buen estado de la maquinaria es tan valioso como detectar un fallo</b>: aporta seguridad en la operación, evita intervenciones innecesarias y permite planificar con certeza.</p>'
    +'</div>'
    +'<div style="margin-top:22px"><b style="font-size:17px;color:#0d2d46">Más allá del ahorro económico</b>'
      +'<p style="font-size:13px;color:#8a98a6;margin:3px 0 12px">Lo que además se consigue al detectar estos fallos a tiempo:</p>'
