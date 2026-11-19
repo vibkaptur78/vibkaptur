@@ -435,16 +435,16 @@ function doPublicar(cid,force){
        var cn=clientName(cid); var pl=upPlantName(); if(pl) cn=cn+' · '+pl;
        var dest=['pedro.ortega@ingenorsistemas.com']; /* fase de prueba: el resumen de publicación va solo a Pedro; después, a Pedro + cliente */
        var h='<div style="font-family:Arial,sans-serif;max-width:620px"><div style="background:#0d2d46;color:#fff;padding:14px 18px;font-weight:bold">INGENOR · VIBKAPTUR — Informe publicado</div><div style="padding:18px 20px;color:#333;font-size:13.5px;line-height:1.6"><p>Hola,</p><p>El informe de <b>'+cn+'</b> ha sido <b>publicado</b> en la plataforma por '+(session.email||'un técnico')+' y ya está disponible para el cliente.</p>'+(force?'<p style="color:#b45309"><b>Publicado igualmente:</b> se ha publicado sin esperar a corregir los avisos de la revisión.</p>':'<p>Publicado tras la revisión automática.</p>')+'<p style="color:#8a98a6;font-size:12px;margin:10px 0 0">— VIBKAPTUR · aviso automático</p></div></div>';
-       var subj='VIBKAPTUR - Informe publicado: '+cn+(force?' (publicado igualmente)':'');
+       var subj='VIBKAPTUR - Informe '+((j&&j.reenvio)?'reenviado':'publicado')+': '+cn+(force?' (publicado igualmente)':'');
        var D=j.datos||null;
-       var dmsg=(D&&D.ok)?('Datos actualizados ('+D.periodo+'): '+D.actualizadas+' con ficha nueva, '+D.ok_sin_ficha+' OK sin ficha, '+D.no_medidas+' no medidas'+((D.nuevas&&D.nuevas.length)?(', '+D.nuevas.length+' nuevas'):'')+'.'):('⚠ Los datos de Análisis y Estadísticas NO se han actualizado'+(D&&D.e?(' (motivo: '+({multiplanta:'cliente con varias plantas, aún no automático',sinfichas:'no hay fichas subidas',sincambios:'ninguna ficha del mes coincide',planta:'planta no indicada',nodatos:'no hay datos previos del cliente'}[D.e]||D.e)+')'):'')+'.');
+       var dmsg=(D&&D.ok&&D.reenvio)?('Reenvío del informe ya publicado'+(D.periodo?(' ('+D.periodo+')'):'')+': los datos no se han modificado.'):(D&&D.ok)?('Datos actualizados ('+D.periodo+'): '+D.actualizadas+' con ficha nueva, '+D.ok_sin_ficha+' OK sin ficha, '+D.no_medidas+' no medidas'+((D.nuevas&&D.nuevas.length)?(', '+D.nuevas.length+' nuevas'):'')+'.'):('⚠ Los datos de Análisis y Estadísticas NO se han actualizado'+(D&&D.e?(' (motivo: '+({multiplanta:'cliente con varias plantas, aún no automático',sinfichas:'no hay fichas subidas',sincambios:'ninguna ficha del mes coincide',planta:'planta no indicada',nodatos:'no hay datos previos del cliente'}[D.e]||D.e)+')'):'')+'.');
        h=h+'<p style="font-family:Arial,sans-serif;font-size:12.5px;color:#334155;margin:10px 0">'+dmsg+'</p>';
        var fin=function(){
          var enviar=function(statsUrl){
            var RS=null; try{ RS=buildClientSummaryEmail(cid,pl,(j&&j.dl)||'',statsUrl||''); }catch(e){ RS=null; }
            if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (fase de prueba: de momento solo lo recibe Pedro):</p>'+RS.html; }
            sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
-             toast('✅ Informe publicado'+(force?' (forzado)':'')+'. '+dmsg+' '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
+             toast('✅ Informe '+((j&&j.reenvio)?'reenviado':'publicado')+(force?' (forzado)':'')+'. '+dmsg+' '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
            });
          };
          /* Análisis estadístico: se genera con los datos recién publicados y se guarda en el servidor para el enlace del correo */
@@ -1582,6 +1582,10 @@ function renderUpload(){
         <button class="btn" onclick="doPublicar('${cid}',false)" style="background:var(--navy)">✓ Dar el OK y publicar</button>
         <button class="btn ghost" onclick="doPublicar('${cid}',true)">Publicar igualmente (a pesar de los avisos)</button>
         <span style="font-size:11px;color:var(--muted)">Hasta que no publiques, el cliente sigue viendo el informe anterior.</span>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn ghost" onclick="doPublicar('${cid}',false)">↻ Volver a enviar el resumen del informe ya publicado</button>
+        <span style="font-size:11px;color:var(--muted)">No hace falta subir de nuevo el PDF ni las fichas: se reenvía el último informe publicado de esta planta.</span>
       </div>
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--steel-soft);border-color:#cfe3f3">
