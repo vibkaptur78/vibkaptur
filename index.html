@@ -453,6 +453,18 @@ function buildClientSummaryEmail(cid,pl,dlUrl,statsUrl){
     +'</table><div style="color:#94a3b8;font-size:11px;margin-top:14px">VIBKAPTUR · © Ingenor Sistemas 2026</div></td></tr></table>';
   return {html:html,subject:'Informe disponible · '+titulo+' · '+mes};
 }
+function sendResumenCliente(cid,pid,subject,html,dry){
+  return fetch('/api/resumen.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:(session&&session.dlToken)||'',c:cid,p:pid||'',subject:subject||'',html:html||'',dry:dry?1:0})})
+    .then(function(r){return r.json();}).catch(function(){return {ok:false,e:'conexion'};});
+}
+function doReenviar(cid){
+  if(!upReady(cid)) return;
+  sendResumenCliente(cid,upPlantId(),'','',true).then(function(x){
+    var n=(x&&x.ok&&x.on)?(x.n||0):0;
+    var msg=n>0?('Se volverá a enviar el resumen a '+n+' destinatario'+(n>1?'s':'')+' del cliente, además del aviso interno. ¿Continuar?'):'El resumen se reenviará solo como aviso interno (el envío al cliente está desactivado o no hay destinatarios). ¿Continuar?';
+    if(confirm(msg)) doPublicar(cid,false);
+  });
+}
 function doPublicar(cid,force,okDest){
   if(!upReady(cid)) return;
   if(!session||!session.dlToken){ toast('No tienes token de sesión. Vuelve a entrar.'); return; }
@@ -471,10 +483,14 @@ function doPublicar(cid,force,okDest){
        var fin=function(){
          var enviar=function(statsUrl){
            var RS=null; try{ RS=buildClientSummaryEmail(cid,pl,(j&&j.dl)||'',statsUrl||''); }catch(e){ RS=null; }
-           if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">Resumen para el cliente (fase de prueba: de momento solo lo recibe Pedro):</p>'+RS.html; }
-           sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
-             toast('✅ Informe '+((j&&j.reenvio)?'reenviado':'publicado')+(force?' (forzado)':'')+'. '+dmsg+' '+((res&&res.ok)?('Aviso enviado a '+dest.join(' y ')+'.'):'⚠ El aviso por correo no se pudo enviar.'));
-           });
+            var interno=function(cli){
+              var ctxt=!RS?'':(cli&&cli.ok&&cli.sent>0)?('Resumen ENVIADO al cliente: '+cli.sent+' destinatario'+(cli.sent>1?'s':'')+(cli.fail?(' ('+cli.fail+' con error)'):'')+'.'):(cli&&cli.ok&&cli.why==='off')?'Resumen NO enviado al cliente: el envío al cliente está desactivado para este cliente (se activa en Clientes y accesos).':(cli&&cli.ok&&cli.why==='nodest')?'Resumen NO enviado al cliente: no hay destinatarios para este cliente o planta.':'⚠ El resumen NO se ha podido enviar al cliente'+((cli&&cli.e)?(' ('+cli.e+')'):'')+'.';
+              if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">'+ctxt+' Esto es lo que recibe el cliente:</p>'+RS.html; }
+              sendAviso({type:'client',to:dest,subject:subj,html:h}).then(function(res){
+                toast('✅ Informe '+((j&&j.reenvio)?'reenviado':'publicado')+(force?' (forzado)':'')+'. '+dmsg+' '+ctxt+' '+((res&&res.ok)?('Aviso interno enviado a '+dest.join(' y ')+'.'):'⚠ El aviso interno por correo no se pudo enviar.'));
+              });
+            };
+            if(RS){ sendResumenCliente(cid,upPlantId(),RS.subject,RS.html,false).then(interno); } else interno(null);
          };
          /* Análisis estadístico: se genera con los datos recién publicados y se guarda en el servidor para el enlace del correo */
          var mm=((j&&j.dl)||'').match(/[?&]m=([a-z0-9-]+)/), sh='';
@@ -1670,7 +1686,7 @@ function renderUpload(){
         <div><b style="color:#fff">4 · Resumen del informe para el cliente</b><p style="margin:4px 0 0;color:#cfe0ee;font-size:12.5px">El resumen sale solo al publicar: estado general, equipos más destacados, descarga del informe (PDF) y análisis estadístico. Aquí puedes verlo o volver a enviarlo sin subir nada de nuevo. En fase de prueba solo lo recibe Pedro.</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn ghost" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)" onclick="showEmailPreview('${cid}')">Previsualizar resumen</button>
-          <button class="btn" style="background:var(--green)" onclick="doPublicar('${cid}',false)">↻ Volver a enviar el resumen de ${cn} →</button>
+          <button class="btn" style="background:var(--green)" onclick="doReenviar('${cid}')">↻ Volver a enviar el resumen de ${cn} →</button>
         </div>
       </div>
     </div>
@@ -1709,7 +1725,7 @@ function doResetPass(){
 }
 var USERS_SRV=null, USERS_ERR='';
 function usersPost(o){ const fd=new FormData(); fd.append('t',(session&&session.dlToken)||''); Object.keys(o).forEach(function(k){fd.append(k,o[k]);}); return fetch('/api/usuarios.php',{method:'POST',body:fd}).then(function(r){return r.json();}); }
-function loadUsers(){ usersPost({a:'list'}).then(function(j){ if(j&&j.ok){USERS_SRV=j.users;USERS_ERR='';} else {USERS_SRV=[];USERS_ERR=(j&&j.e)||'error';} if(view&&view.name==='users') render(); }).catch(function(){ USERS_SRV=[]; USERS_ERR='conexion'; if(view&&view.name==='users') render(); }); }
+function loadUsers(){ DEST_SRV=null; usersPost({a:'list'}).then(function(j){ if(j&&j.ok){USERS_SRV=j.users;USERS_ERR='';} else {USERS_SRV=[];USERS_ERR=(j&&j.e)||'error';} if(view&&view.name==='users') render(); }).catch(function(){ USERS_SRV=[]; USERS_ERR='conexion'; if(view&&view.name==='users') render(); }); }
 function uEsc(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function altaRolChange(){ const r=document.getElementById('altaRol').value; document.getElementById('altaCliBox').style.display=(r==='client')?'':'none'; }
 function altaCliChange(){ const cid=document.getElementById('altaCli').value; const c=DATA.clients.find(function(x){return x.id===cid;}); const sel=document.getElementById('altaPlanta'); const box=document.getElementById('altaPlantaBox');
@@ -1733,6 +1749,40 @@ function doBajaUser(email){
   if(!confirm('¿Dar de baja a '+email+'? Dejará de poder entrar en la plataforma.')) return;
   usersPost({a:'baja',email:email}).then(function(j){ if(j&&j.ok){ window._altaMsg=''; loadUsers(); } else { alert('No se pudo: '+(ALTA_ERR[(j&&j.e)]||((j&&j.e)||'error'))); } }).catch(function(){ alert('Error de conexión.'); });
 }
+var DEST_SRV=null;
+function destPost(o){ const fd=new FormData(); fd.append('t',(session&&session.dlToken)||''); Object.keys(o).forEach(function(k){fd.append(k,o[k]);}); return fetch('/api/destinatarios.php',{method:'POST',body:fd}).then(function(r){return r.json();}); }
+function destSet(j){ if(j&&j.ok){ DEST_SRV={cfg:j.cfg||{},users:j.users||[]}; } else { DEST_SRV={cfg:{},users:[],err:(j&&j.e)||'error'}; } if(view&&view.name==='users') render(); }
+function loadDest(){ destPost({a:'get'}).then(destSet).catch(function(){ destSet({ok:false,e:'conexion'}); }); }
+function destCli(){ return window._destCli||''; }
+function destPick(){ window._destCli=document.getElementById('destCli').value; render(); }
+function destOn(v){ const c=destCli(); if(!c) return; if(v && !confirm('Vas a ACTIVAR el envío automático al cliente. Desde ahora, cada vez que se publique o se reenvíe un informe de este cliente, el resumen saldrá a todos los destinatarios de la lista. Revisa antes que los correos son los correctos. ¿Activar?')) return; destPost({a:'on',c:c,v:v?'1':'0'}).then(destSet); }
+function destAdd(){ const c=destCli(); const e=(document.getElementById('destEmail').value||'').trim().toLowerCase(); const p=(document.getElementById('destPlanta')||{}).value||''; if(!c||!e) return; destPost({a:'add',c:c,p:p,email:e}).then(function(j){ if(j&&j.ok) destSet(j); else alert('No se pudo: '+({email:'el correo no es válido',write:'el servidor no ha podido guardarlo',muchos:'demasiados correos en esa lista'}[(j&&j.e)]||((j&&j.e)||'error'))); }); }
+function destDel(p,e){ const c=destCli(); if(!c) return; destPost({a:'del',c:c,p:p,email:e}).then(destSet); }
+function renderDest(inp){
+  if(DEST_SRV===null){ loadDest(); return '<div class="card pad" style="max-width:580px;margin-top:16px"><b style="font-size:14px">Destinatarios del resumen</b><p class="sub" style="margin-top:10px">Cargando…</p></div>'; }
+  const cid=window._destCli||''; const c=DATA.clients.find(function(x){return x.id===cid;});
+  const cliOpts='<option value="">— Elige cliente —</option>'+DATA.clients.map(function(x){ const on=DEST_SRV.cfg[x.id]&&DEST_SRV.cfg[x.id].on; return '<option value="'+uEsc(x.id)+'"'+(x.id===cid?' selected':'')+'>'+uEsc(x.name)+(on?' — envío activado':'')+'</option>'; }).join('');
+  let body='';
+  if(c){
+    const k=DEST_SRV.cfg[cid]||{}; const on=!!k.on; const ex=k.extra||{}; const pls=c.plants||[]; const multi=pls.length>1;
+    const pname=function(id){ const p=pls.find(function(x){return x.id===id;}); return p?p.name:id; };
+    const us=DEST_SRV.users.filter(function(u){return u.c===cid;});
+    const td='padding:7px 10px;border-top:1px solid var(--line)';
+    const li=[];
+    us.forEach(function(u){ li.push('<tr><td style="'+td+'">'+uEsc(u.email)+'<br><span style="color:var(--muted);font-size:12px">Usuario de la plataforma'+(u.name?(' · '+uEsc(u.name)):'')+'</span></td><td style="'+td+';font-size:12.5px">'+(multi?(u.plant?('Solo '+uEsc(pname(u.plant))):'Todas las plantas'):'')+'</td><td style="'+td+'"></td></tr>'); });
+    Object.keys(ex).forEach(function(pk){ (ex[pk]||[]).forEach(function(e){ li.push('<tr><td style="'+td+'">'+uEsc(e)+'<br><span style="color:var(--muted);font-size:12px">Correo añadido (sin usuario)</span></td><td style="'+td+';font-size:12.5px">'+(multi?(pk==='*'?'Todas las plantas':('Solo '+uEsc(pname(pk)))):'')+'</td><td style="'+td+';text-align:right"><a style="color:#c0392b;cursor:pointer;font-size:12.5px" data-p="'+uEsc(pk==='*'?'':pk)+'" data-e="'+uEsc(e)+'" onclick="destDel(this.getAttribute(\'data-p\'),this.getAttribute(\'data-e\'))">Quitar</a></td></tr>'); }); });
+    body='<div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:'+(on?'#eaf7ef':'#f4f6f8')+';font-size:13px;line-height:1.6"><b>'+(on?'Envío al cliente ACTIVADO':'Envío al cliente desactivado')+'</b><br><span style="color:var(--muted)">'+(on?'Al publicar o reenviar un informe, el resumen sale a los destinatarios de esta lista.':'El resumen de este cliente solo te llega a ti. No se envía nada al cliente.')+'</span><br><button class="btn ghost sm" style="margin-top:8px" onclick="destOn('+(on?'false':'true')+')">'+(on?'Desactivar el envío al cliente':'Activar el envío al cliente')+'</button></div>'
+      +'<div style="margin-top:14px;font-size:13px"><b>Recibirán el resumen ('+li.length+')</b></div>'
+      +(li.length?('<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px">'+li.join('')+'</table>'):'<p class="sub" style="margin-top:6px">Todavía no hay nadie: da de alta un usuario de este cliente o añade un correo aquí debajo.</p>')
+      +'<div class="field" style="margin-top:14px"><label>Añadir un correo que no tiene usuario</label><input id="destEmail" type="email" autocomplete="off" placeholder="nombre@empresa.com" style="'+inp+'"></div>'
+      +(multi?('<div class="field"><label>Para qué planta</label><select id="destPlanta" style="'+inp+'"><option value="">Todas las plantas</option>'+pls.map(function(p){return '<option value="'+uEsc(p.id)+'">Solo '+uEsc(p.name)+'</option>';}).join('')+'</select></div>'):'')
+      +'<button class="btn" style="width:100%" onclick="destAdd()">➕ Añadir correo</button>';
+  }
+  return '<div class="card pad" style="max-width:580px;margin-top:16px"><b style="font-size:14px">Destinatarios del resumen</b><p class="sub" style="margin:6px 0 0">A quién le llega el correo de resumen cuando se publica un informe. Los usuarios dados de alta de ese cliente lo reciben siempre; aquí puedes añadir más correos.</p>'
+    +(DEST_SRV.err?('<p class="sub" style="margin-top:10px">No se ha podido leer del servidor ('+uEsc(DEST_SRV.err)+').</p>'):'')
+    +'<div class="field" style="margin-top:12px"><label>Cliente</label><select id="destCli" style="'+inp+'" onchange="destPick()">'+cliOpts+'</select></div>'+body+'</div>';
+}
+
 function renderUsers(){
   if(USERS_SRV===null){ loadUsers(); }
   const L=USERS_SRV||[];
@@ -1776,6 +1826,7 @@ function renderUsers(){
       <b style="font-size:14px">Usuarios con acceso (${L.length})</b>
       ${USERS_SRV===null?'<p class="sub" style="margin-top:10px">Cargando…</p>':(USERS_ERR?('<p class="sub" style="margin-top:10px">No se ha podido leer la lista del servidor ('+uEsc(USERS_ERR)+').</p>'):('<table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:13px">'+rows+'</table>'))}
     </div>
+    ${renderDest(inp)}
   </main>`;
 }
 
