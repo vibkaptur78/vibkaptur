@@ -1707,21 +1707,74 @@ function doResetPass(){
     else { out.textContent='No se pudo ('+((j&&j.e)||'error')+'). ¿Tienes permiso de administración?'; }
   }).catch(function(){ if(out)out.textContent='Error de conexión.'; });
 }
+var USERS_SRV=null, USERS_ERR='';
+function usersPost(o){ const fd=new FormData(); fd.append('t',(session&&session.dlToken)||''); Object.keys(o).forEach(function(k){fd.append(k,o[k]);}); return fetch('/api/usuarios.php',{method:'POST',body:fd}).then(function(r){return r.json();}); }
+function loadUsers(){ usersPost({a:'list'}).then(function(j){ if(j&&j.ok){USERS_SRV=j.users;USERS_ERR='';} else {USERS_SRV=[];USERS_ERR=(j&&j.e)||'error';} if(view&&view.name==='users') render(); }).catch(function(){ USERS_SRV=[]; USERS_ERR='conexion'; if(view&&view.name==='users') render(); }); }
+function uEsc(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function altaRolChange(){ const r=document.getElementById('altaRol').value; document.getElementById('altaCliBox').style.display=(r==='client')?'':'none'; }
+function altaCliChange(){ const cid=document.getElementById('altaCli').value; const c=DATA.clients.find(function(x){return x.id===cid;}); const sel=document.getElementById('altaPlanta'); const box=document.getElementById('altaPlantaBox');
+  const pls=(c&&c.plants)||[]; if(pls.length>1){ sel.innerHTML='<option value="">Todas las plantas</option>'+pls.map(function(p){return '<option value="'+uEsc(p.id)+'">Solo '+uEsc(p.name)+'</option>';}).join(''); box.style.display=''; } else { sel.innerHTML='<option value=""></option>'; box.style.display='none'; } }
+const ALTA_ERR={email:'El correo no es válido.',existe:'Ya existe un usuario con ese correo.',nombre:'Falta el nombre.',cliente:'Elige el cliente.',planta:'La planta no pertenece a ese cliente.',clavecorta:'La contraseña debe tener al menos 10 caracteres.',noadmin:'Solo el administrador puede dar de alta usuarios.',exp:'Sesión caducada, vuelve a entrar.',token:'Sesión no válida, vuelve a entrar.',write:'El servidor no ha podido guardar el cambio.',sintecnico:'No hay ningún técnico de referencia.',esadmin:'Un administrador no se puede dar de baja desde aquí.'};
+function doAltaUser(){
+  const out=document.getElementById('altaOut'); const g=function(id){return (document.getElementById(id).value||'').trim();};
+  const role=g('altaRol'), email=g('altaEmail').toLowerCase(), name=g('altaNombre');
+  if(!email||email.indexOf('@')<1){ out.textContent='Escribe el correo del usuario.'; return; }
+  if(!name){ out.textContent='Escribe el nombre que verá el usuario.'; return; }
+  if(role==='client' && !g('altaCli')){ out.textContent='Elige el cliente.'; return; }
+  const o={a:'alta',email:email,name:name,puesto:g('altaPuesto'),role:role,newpass:g('altaPass')};
+  if(role==='client'){ o.c=g('altaCli'); o.plant=g('altaPlanta'); }
+  out.textContent='Procesando…';
+  usersPost(o).then(function(j){
+    if(j&&j.ok){ window._altaMsg='✅ Usuario creado: <b>'+uEsc(j.email)+'</b><br>Contraseña: <code style="background:#eef3f8;padding:3px 8px;border-radius:6px;font-size:13px;user-select:all">'+uEsc(j.newpass)+'</code><br><span style="color:var(--muted)">Cópiala y entrégasela al usuario — no se vuelve a mostrar.</span>'; loadUsers(); }
+    else { out.textContent='No se pudo: '+(ALTA_ERR[(j&&j.e)]||((j&&j.e)||'error')); }
+  }).catch(function(){ out.textContent='Error de conexión.'; });
+}
+function doBajaUser(email){
+  if(!confirm('¿Dar de baja a '+email+'? Dejará de poder entrar en la plataforma.')) return;
+  usersPost({a:'baja',email:email}).then(function(j){ if(j&&j.ok){ window._altaMsg=''; loadUsers(); } else { alert('No se pudo: '+(ALTA_ERR[(j&&j.e)]||((j&&j.e)||'error'))); } }).catch(function(){ alert('Error de conexión.'); });
+}
 function renderUsers(){
-  const opts=USER_LIST.map(function(u){return '<option value="'+u.e+'">'+u.n+' — '+u.e+'</option>';}).join('');
+  if(USERS_SRV===null){ loadUsers(); }
+  const L=USERS_SRV||[];
+  const opts=(L.length?L.map(function(u){return {e:u.email,n:u.name||u.email};}):USER_LIST).map(function(u){return '<option value="'+uEsc(u.e)+'">'+uEsc(u.n)+' — '+uEsc(u.e)+'</option>';}).join('');
+  const inp='width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:9px;font-size:13px';
+  const cliOpts='<option value="">— Elige cliente —</option>'+DATA.clients.map(function(c){return '<option value="'+uEsc(c.id)+'">'+uEsc(c.name)+'</option>';}).join('');
+  const cname=function(u){ const c=DATA.clients.find(function(x){return x.id===u.c;}); if(!c) return u.c||''; const p=u.plant?(c.plants||[]).find(function(x){return x.id===u.plant;}):null; return c.name+(p?(' · '+p.name):''); };
+  const rolTxt=function(u){ return u.role==='admin'?'Administrador':u.role==='tecnico'?'Técnico Ingenor':'Cliente'; };
+  const rows=L.map(function(u){ return '<tr><td style="padding:8px 10px;border-top:1px solid var(--line)"><b>'+uEsc(u.name||'')+'</b><br><span style="color:var(--muted);font-size:12px">'+uEsc(u.email)+'</span></td><td style="padding:8px 10px;border-top:1px solid var(--line);font-size:12.5px">'+rolTxt(u)+(u.role==='client'?('<br><span style="color:var(--muted)">'+uEsc(cname(u))+'</span>'):'')+'</td><td style="padding:8px 10px;border-top:1px solid var(--line);text-align:right">'+(u.role==='admin'?'':'<a style="color:#c0392b;cursor:pointer;font-size:12.5px" data-e="'+uEsc(u.email)+'" onclick="doBajaUser(this.getAttribute(\'data-e\'))">Dar de baja</a>')+'</td></tr>'; }).join('');
+  const msg=window._altaMsg||'';
   return `<main>
     <div class="crumbs"><b>Accesos y contraseñas</b></div>
     <h1>Accesos y contraseñas</h1>
-    <p class="sub">Las contraseñas se guardan <b>cifradas</b> en el servidor. Desde aquí puedes resetear o rotar la de cualquier usuario.</p>
-    ${adminBanner("Solo administración. Al resetear se genera una clave nueva (o pones tú una); cópiala y entrégala al usuario.")}
+    <p class="sub">Las contraseñas se guardan <b>cifradas</b> en el servidor. Desde aquí puedes dar de alta usuarios, darlos de baja y resetear o rotar la contraseña de cualquiera.</p>
+    ${adminBanner("Solo administración. Al crear un usuario o resetear su clave se genera una contraseña nueva (o pones tú una); cópiala y entrégala al usuario.")}
     <div class="card pad" style="max-width:580px">
+      <b style="font-size:14px">Dar de alta un usuario</b>
+      <div class="field" style="margin-top:12px"><label>Tipo de usuario</label>
+        <select id="altaRol" style="${inp}" onchange="altaRolChange()"><option value="client">Cliente (solo ve sus informes)</option><option value="tecnico">Técnico de Ingenor</option></select></div>
+      <div id="altaCliBox">
+        <div class="field"><label>Cliente</label><select id="altaCli" style="${inp}" onchange="altaCliChange()">${cliOpts}</select></div>
+        <div class="field" id="altaPlantaBox" style="display:none"><label>Qué plantas ve</label><select id="altaPlanta" style="${inp}"><option value=""></option></select></div>
+      </div>
+      <div class="field"><label>Correo (será su usuario para entrar)</label><input id="altaEmail" type="email" autocomplete="off" placeholder="nombre@empresa.com" style="${inp}"></div>
+      <div class="field"><label>Nombre que verá</label><input id="altaNombre" type="text" autocomplete="off" placeholder="Nombre y apellido, o empresa" style="${inp}"></div>
+      <div class="field"><label>Puesto — opcional</label><input id="altaPuesto" type="text" autocomplete="off" placeholder="Mantenimiento, Dirección…" style="${inp}"></div>
+      <div class="field"><label>Contraseña — opcional (si la dejas vacía, se genera una segura)</label><input id="altaPass" type="text" autocomplete="off" placeholder="Dejar vacío para generar una segura" style="${inp}"></div>
+      <button class="btn" style="width:100%" onclick="doAltaUser()">➕ Crear usuario</button>
+      <div id="altaOut" style="font-size:12.5px;color:var(--muted);margin-top:12px;line-height:1.7;word-break:break-all">${msg}</div>
+    </div>
+    <div class="card pad" style="max-width:580px;margin-top:16px">
       <b style="font-size:14px">Resetear / rotar contraseña</b>
       <div class="field" style="margin-top:12px"><label>Usuario</label>
-        <select id="resetEmail" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:9px;font-size:13px">${opts}</select></div>
+        <select id="resetEmail" style="${inp}">${opts}</select></div>
       <div class="field"><label>Nueva contraseña — opcional (si la dejas vacía, se genera una segura)</label>
-        <input id="resetNew" type="text" autocomplete="off" placeholder="Dejar vacío para generar una segura" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:9px;font-size:13px"></div>
+        <input id="resetNew" type="text" autocomplete="off" placeholder="Dejar vacío para generar una segura" style="${inp}"></div>
       <button class="btn" style="width:100%" onclick="doResetPass()">🔑 Resetear / rotar contraseña</button>
       <div id="resetOut" style="font-size:12.5px;color:var(--muted);margin-top:12px;line-height:1.7;word-break:break-all"></div>
+    </div>
+    <div class="card pad" style="max-width:580px;margin-top:16px">
+      <b style="font-size:14px">Usuarios con acceso (${L.length})</b>
+      ${USERS_SRV===null?'<p class="sub" style="margin-top:10px">Cargando…</p>':(USERS_ERR?('<p class="sub" style="margin-top:10px">No se ha podido leer la lista del servidor ('+uEsc(USERS_ERR)+').</p>'):('<table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:13px">'+rows+'</table>'))}
     </div>
   </main>`;
 }
