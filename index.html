@@ -346,6 +346,68 @@ function doRevisarTermo(cid){
      }
    }).catch(function(){ msg('Word recibido, pero hubo un error de conexión al revisarlo.'); });
 }
+function doDownloadTermo(cid,pid){
+  if(session&&session.canDownload===false){ toast('La descarga del informe es exclusiva del cliente y de administración.'); return; }
+  if(!(session&&session.dlToken)){ toast('Preparando la descarga… espera un segundo y vuelve a pulsar.'); return; }
+  window.location.href='/api/termodl.php?t='+encodeURIComponent(session.dlToken)+'&c='+encodeURIComponent(cid)+(pid?('&p='+encodeURIComponent(pid)):'');
+}
+function doUploadTermoPdf(cid){
+  if(!upReady(cid)) return;
+  var inp=document.getElementById('termoPdfFile'); var st=document.getElementById('upStatusTP'); function msg(t){ if(st)st.innerHTML=t; }
+  if(!inp||!inp.files||!inp.files.length){ msg('Elige primero el PDF de termografías.'); return; }
+  var f=inp.files[0];
+  if(!session||!session.dlToken){ msg('No tienes token de sesión. Cierra sesión y vuelve a entrar.'); return; }
+  if(!/\.pdf$/i.test(f.name)){ msg('El archivo debe ser un <b>PDF</b>.'); return; }
+  if(f.size>60*1024*1024){ msg('El PDF es demasiado grande (máx. 60 MB).'); return; }
+  msg('Subiendo <b>'+f.name+'</b>…');
+  var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('p',upPlantId()); fd.append('k','termo'); fd.append('file',f);
+  fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
+    if(j&&j.ok&&j.kind==='termopdf'){ msg('✅ PDF de termografías recibido ('+Math.round(j.bytes/1024)+' KB). Queda retenido hasta que publiques.'); }
+    else if(j&&j.ok){ msg('⚠ El servidor lo ha guardado como informe de vibraciones, no de termografías. Avisa a administración antes de publicar nada.'); }
+    else { msg('No se pudo subir ('+((j&&j.e)||'error')+').'); }
+  }).catch(function(){ msg('Error de conexión al subir el PDF.'); });
+}
+function doPublicarTermo(cid,force,okDest,soloReenvio){
+  if(!upReady(cid)) return;
+  var st=document.getElementById('upStatusTPub'); function msg(t){ if(st)st.innerHTML=t; }
+  if(!session||!session.dlToken){ msg('No tienes token de sesión. Vuelve a entrar.'); return; }
+  if(force && !confirm('¿Publicar las termografías a pesar de los avisos de revisión? El cliente verá el informe tal como está en el Word.')) return;
+  var pid=upPlantId(), pl=upPlantName(), cn=clientName(cid)+(pl?(' · '+pl):'');
+  var ERR={nopublicado:'Todavía no hay termografías publicadas en esta planta.',noword:'Sube primero el Word de termografías.',nopdf:'Falta subir el PDF de termografías.',fallos:'La revisión tiene puntos pendientes. Corrige el Word y vuelve a subirlo, o usa «Publicar igualmente».',noup:'Tu usuario no tiene permiso.',sinfecha:'El Word no tiene fecha de informe en la portada.',sincuadros:'No se han encontrado cuadros en el Word.',move:'No se pudo guardar el PDF.',val:'La revisión dio un error.'};
+  var seguir=function(){
+    msg('Publicando termografías…');
+    fetch('/api/termo.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,p:pid,a:'publicar',force:force?1:0,confirm:okDest?1:0,reenvio:soloReenvio?1:0})})
+     .then(function(r){return r.json();}).then(function(j){
+       if(!(j&&j.ok)){
+         var e=(j&&j.e)||'error';
+         if(e==='otrocliente'){ if(confirm('⚠ Este Word parece de otro cliente o planta.\n\n'+(j.msg||'')+'\n\nNo se ha publicado nada.\n\n¿Publicarlo de todos modos en '+cn+'?')) doPublicarTermo(cid,force,true); else msg('No se ha publicado. Revisa el cliente y la planta.'); return; }
+         msg('No se pudo publicar: '+(ERR[e]||e)+((e==='fallos'&&j.n)?(' ('+j.n+' punto(s))'):'')); return;
+       }
+       if(soloReenvio && !j.reenvio){ /* habia Word y PDF nuevos: se ha publicado de verdad */ }
+       var D=j.datos||null; var re_=!!j.reenvio;
+       var dmsg=re_?('Reenvío del informe de termografías ya publicado ('+j.periodo+'): los datos no se han modificado.'):('Datos actualizados ('+j.periodo+'): '+D.actualizados+' cuadros, '+D.fotos+' fotos'+((D.nuevos&&D.nuevos.length)?(', '+D.nuevos.length+' cuadros nuevos'):'')+((D.no_vienen&&D.no_vienen.length)?(', '+D.no_vienen.length+' que no vienen en este informe'):'')+'.');
+       var fin=function(){
+         var RS=null; try{ RS=buildClientSummaryEmail(cid,pl,j.dl||'','','termo'); }catch(e){ RS=null; }
+         var subj='VIBKAPTUR - Termografías '+(re_?'reenviadas':'publicadas')+': '+cn+(force?' (publicado igualmente)':'');
+         var h='<div style="font-family:Arial,sans-serif;max-width:620px"><div style="background:#0d2d46;color:#fff;padding:14px 18px;font-weight:bold">INGENOR · VIBKAPTUR — Termografías '+(re_?'reenviadas':'publicadas')+'</div><div style="padding:18px 20px;color:#333;font-size:13.5px;line-height:1.6"><p>Hola,</p><p>El informe de termografías de <b>'+cn+'</b> ha sido <b>'+(re_?'reenviado':'publicado')+'</b> en la plataforma por '+(session.email||'un técnico')+'.</p>'+(re_?'':force?('<p style="color:#b45309"><b>Publicado igualmente:</b> quedaban '+(j.avisos||0)+' punto(s) de la revisión sin corregir.</p>'):'<p>Publicado tras la revisión automática.</p>')+'<p style="color:#8a98a6;font-size:12px;margin:10px 0 0">— VIBKAPTUR · aviso automático</p></div></div><p style="font-family:Arial,sans-serif;font-size:12.5px;color:#334155;margin:10px 0">'+dmsg+'</p>';
+         var interno=function(cli){
+           var ctxt=!RS?'':(cli&&cli.ok&&cli.sent>0)?('Resumen ENVIADO al cliente: '+cli.sent+' destinatario'+(cli.sent>1?'s':'')+(cli.fail?(' ('+cli.fail+' con error)'):'')+'.'):(cli&&cli.ok&&cli.why==='off')?'Resumen NO enviado al cliente: el envío al cliente está desactivado para este cliente (se activa en Clientes y accesos).':(cli&&cli.ok&&cli.why==='nodest')?'Resumen NO enviado al cliente: no hay destinatarios para este cliente o planta.':'⚠ El resumen NO se ha podido enviar al cliente'+((cli&&cli.e)?(' ('+cli.e+')'):'')+'.';
+           if(RS){ h=h+'<p style="font-family:Arial,sans-serif;font-size:12px;color:#64748b;margin:18px 0 8px">'+ctxt+' Esto es lo que recibe el cliente:</p>'+RS.html; }
+           sendAviso({type:'client',to:['pedro.ortega@ingenorsistemas.com'],subject:subj,html:h}).then(function(res){
+             msg('✅ Termografías '+(re_?'reenviadas':'publicadas')+'. '+dmsg+' '+ctxt+' '+((res&&res.ok)?'Aviso interno enviado.':'⚠ El aviso interno por correo no se pudo enviar.'));
+           });
+         };
+         if(RS){ sendResumenCliente(cid,pid,RS.subject,RS.html,false).then(interno); } else interno(null);
+       };
+       if(!re_){ loadClientData(session.dlToken).then(fin).catch(fin); } else fin();
+     }).catch(function(){ msg('Error de conexión al publicar.'); });
+  };
+  if(soloReenvio){
+    sendResumenCliente(cid,pid,'','',true).then(function(x){ var n=(x&&x.ok&&x.on)?(x.n||0):0;
+      if(confirm(n>0?('Se volverá a enviar el resumen de termografías a '+n+' destinatario'+(n>1?'s':'')+' del cliente, además del aviso interno. ¿Continuar?'):'El resumen se reenviará solo como aviso interno (el envío al cliente está desactivado o no hay destinatarios). ¿Continuar?')) seguir(); });
+  } else seguir();
+}
+
 function doUploadWord(cid){
   if(!upReady(cid)) return;
   var inp=document.getElementById('wordFile');
@@ -435,24 +497,27 @@ function upDestMsg(cid,d){
 }
 function upPlantId(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return e.value||'';}
 function upPlantName(){var e=document.getElementById('upPlanta');if(!e||e.options.length<2||e.selectedIndex<0)return '';return (e.options[e.selectedIndex].text||'').trim();}
-function buildClientSummaryEmail(cid,pl,dlUrl,statsUrl){
+function buildClientSummaryEmail(cid,pl,dlUrl,statsUrl,kind){
+  var TERMO=(kind==='termo');
   /* Formato aprobado por Pedro (simulacro ELIS): cabecera VIBKAPTUR, 4 contadores y tabla "Equipos más destacados" (estado · equipo · origen), sin recomendaciones */
   var c=DATA.clients.find(function(x){return x.id===cid;}); if(!c) return null;
   var plants=(c.plants||[]); if(pl){ var fp=plants.filter(function(p){return (p.name||'').trim()===pl;}); if(fp.length) plants=fp; }
   var all=[],areas={}; plants.forEach(function(p){(p.areas||[]).forEach(function(a){(a.machines||[]).forEach(function(m){ if(!m.nomedido&&!m.placeholder) all.push(Object.assign({area:a.name},m)); });});});
+  if(TERMO){ all=all.filter(function(m){return m.tmax!==undefined;}); } else {
   var vib=all.filter(function(m){return m.tmax===undefined;}); if(vib.length) all=vib; /* informe de vibraciones: no contar cuadros de termografía */
+  }
   if(!all.length) return null;
   all.forEach(function(m){ areas[m.area]=1; });
   var counts={bueno:0,seg:0,alerta:0,peligro:0}; all.forEach(function(m){ if(counts[m.state]!==undefined) counts[m.state]++; });
   var crit=all.filter(function(m){return (m.grade||0)>=5;}).sort(function(a,b){return b.grade-a.grade;}).slice(0,8);
   if(!crit.length) crit=all.filter(function(m){return (m.grade||0)>=3;}).sort(function(a,b){return b.grade-a.grade;}).slice(0,5);
-  var mainFen=function(m){ var b=null; (m.fens||[]).forEach(function(f){ if(!b||(f.grado||0)>(b.grado||0)) b=f; }); return (b&&(b.grado||0)>=3)?String(b.f||'').split(' · ')[0]:''; };
+  var mainFen=function(m){ if(TERMO){ var d=String(m.defecto||'').trim(); return /no se detecta/i.test(d)?'':d; } var b=null; (m.fens||[]).forEach(function(f){ if(!b||(f.grado||0)>(b.grado||0)) b=f; }); return (b&&(b.grado||0)>=3)?String(b.f||'').split(' · ')[0]:''; };
   var P0=plants[0]||{};
   var MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  var md=String(P0.medicion||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  var md=String((TERMO?((P0.termo&&P0.termo.fecha)||''):P0.medicion)||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   var mes=md?(MES[parseInt(md[2],10)-1]+' '+md[3]):new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'}).replace(' de ',' ');
   var titulo=(pl?(c.name+' · '+pl):((plants.length===1&&P0.name&&P0.name.toLowerCase().indexOf(String(c.name).toLowerCase())<0)?(c.name+' · '+P0.name):c.name));
-  var sub=[]; if(plants.length===1&&P0.loc&&!/vibraci|termograf/i.test(P0.loc)&&String(P0.loc).toLowerCase().indexOf(String(c.name).toLowerCase())<0) sub.push(P0.loc); sub.push('Análisis de vibraciones'); 
+  var sub=[]; if(plants.length===1&&P0.loc&&!/vibraci|termograf/i.test(P0.loc)&&String(P0.loc).toLowerCase().indexOf(String(c.name).toLowerCase())<0) sub.push(P0.loc); sub.push(TERMO?'Termografía de cuadros eléctricos':'Análisis de vibraciones'); 
   var box=function(n,lab,bg,bd,c1,c2){return '<td width="25%" style="padding:4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="'+bg+'" style="background:'+bg+';border:1px solid '+bd+';border-radius:10px;padding:12px 4px;text-align:center"><div style="font-size:22px;font-weight:800;color:'+c1+'">'+n+'</div><div style="font-size:11px;color:'+c2+';font-weight:600">'+lab+'</div></td></tr></table></td>';};
   var chip=function(g){var t=g>=7?['AVISO','#b91c1c']:g>=5?['ALERTA','#d97706']:['SEGUIMIENTO','#2563eb'];return '<span style="display:inline-block;background:'+t[1]+';color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">&nbsp;'+t[0]+' · G'+g+'&nbsp;</span>';};
   var td='padding:9px 10px;border-bottom:1px solid #eef1f4;font-size:13px;color:#0f172a';
@@ -464,7 +529,7 @@ function buildClientSummaryEmail(cid,pl,dlUrl,statsUrl){
     +'<tr><td bgcolor="#0b2545" style="background:#0b2545;background:linear-gradient(135deg,#0b2545,#13315c);padding:22px 28px;border-radius:14px 14px 0 0"><div style="color:#fff;font-size:20px;font-weight:800;letter-spacing:.5px">VIBKAPTUR</div><div style="color:#9fc0e8;font-size:12px;font-weight:600;margin-top:2px">Mantenimiento predictivo · Ingenor Sistemas</div></td></tr>'
     +'<tr><td style="padding:26px 28px 6px"><div style="font-size:12px;font-weight:700;color:#2563eb;letter-spacing:.4px;text-transform:uppercase">Informe disponible</div><h1 style="margin:6px 0 2px;font-size:21px;color:#0f172a">'+titulo+' — '+mes+'</h1><div style="color:#64748b;font-size:13px">'+sub.join(' · ')+'</div></td></tr>'
     +'<tr><td style="padding:14px 28px 2px"><p style="font-size:14px;color:#334155;line-height:1.6;margin:0 0 14px">Estimado cliente,<br>ya está disponible el informe de la última campaña de mantenimiento predictivo de su planta. Le resumimos el estado general y los equipos más destacados. El detalle y nuestras recomendaciones los encontrará en el informe completo.</p></td></tr>'
-    +'<tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px"><tr>'+box(counts.bueno,'Correctos','#f0fdf4','#bbf7d0','#15803d','#166534')+box(counts.seg,'En seguimiento','#eff6ff','#bfdbfe','#1d4ed8','#1e40af')+box(counts.alerta,'En alerta','#fffbeb','#fde68a','#b45309','#92400e')+box(counts.peligro,'Aviso','#fef2f2','#fecaca','#b91c1c','#991b1b')+'</tr></table><div style="font-size:12px;color:#64748b;text-align:right;margin:2px 4px 16px">'+all.length+' equipos analizados'+(nA>1?(' en '+nA+' áreas'):'')+'</div></td></tr>'
+    +'<tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px"><tr>'+box(counts.bueno,'Correctos','#f0fdf4','#bbf7d0','#15803d','#166534')+box(counts.seg,'En seguimiento','#eff6ff','#bfdbfe','#1d4ed8','#1e40af')+box(counts.alerta,'En alerta','#fffbeb','#fde68a','#b45309','#92400e')+box(counts.peligro,'Aviso','#fef2f2','#fecaca','#b91c1c','#991b1b')+'</tr></table><div style="font-size:12px;color:#64748b;text-align:right;margin:2px 4px 16px">'+all.length+(TERMO?' cuadros analizados':' equipos analizados')+(nA>1?(' en '+nA+' áreas'):'')+'</div></td></tr>'
     +'<tr><td style="padding:0 28px">'+tabla+'</td></tr>'
     +'<tr><td style="padding:22px 28px 8px" align="center"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#2563eb" style="background:#2563eb;border-radius:10px;padding:13px 22px"><a href="'+(dlUrl||('https://vibkaptur.com/?dl='+encodeURIComponent(cid)+((pl&&plants.length===1&&plants[0].id&&(c.plants||[]).length>1)?('&p='+encodeURIComponent(plants[0].id)):'')))+'" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px"><span style="color:#ffffff">'+(dlUrl?'Descargar el informe (PDF) →':'Ver el informe completo en VIBKAPTUR →')+'</span></a></td>'+(statsUrl?('<td width="10" style="font-size:1px">&nbsp;</td><td bgcolor="#2f6f52" style="background:#2f6f52;border-radius:10px;padding:13px 22px"><a href="'+statsUrl+'" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px"><span style="color:#ffffff">Análisis estadístico →</span></a></td>'):'')+'</tr></table>'+(statsUrl?'<div style="font-size:11px;color:#94a3b8;margin-top:8px">Análisis estadístico: resumen de resultados para el control de parámetros de eficacia del mantenimiento</div>':'')+'</td></tr>'
     +'<tr><td style="padding:6px 28px 20px" align="center"><div style="font-size:13px;color:#334155;line-height:1.6">Le recomendamos entrar en <a href="https://vibkaptur.com" style="color:#2563eb;font-weight:700;text-decoration:none">vibkaptur.com</a> para más detalle en este informe y poder compaginar el diagnóstico con otras tecnologías si las tiene contratadas.</div><div style="font-size:11px;color:#94a3b8;margin-top:6px">Acceso con el usuario facilitado por Ingenor Sistemas</div></td></tr>'
@@ -972,6 +1037,7 @@ function developTermo(defecto, act){
   if(a && !/no se detectan/i.test(d)) out += ' Se recomienda '+a.toLowerCase().replace(/[.;]+$/,'')+'.';
   return out;
 }
+function termoSrc(x,c,p){ x=String(x||''); if(x.indexOf('data:')===0) return x; if(x.indexOf('srv:')===0) return '/api/termoimg.php?t='+encodeURIComponent((session&&session.dlToken)||'')+'&c='+encodeURIComponent(c.id)+(((c.plants||[]).length>1&&p&&p.id)?('&p='+encodeURIComponent(p.id)):'')+'&f='+encodeURIComponent(x.slice(4)); return 'https://raw.githubusercontent.com/vibkaptur78/vibkaptur/main/assets2/termo/'+x; }
 function renderMachineTermo(c,p,m){
   const anomalia = m.defecto && m.defecto.toUpperCase().indexOf('NO SE DETECTAN')<0;
   const gcol=g=>g>=7?'#d23b3b':g>=5?'#e08a00':g>=3?'#b8860b':'#2f6f52';
@@ -979,10 +1045,10 @@ function renderMachineTermo(c,p,m){
   const imgs = (m.ir||m.dig) ? `<div class="two-col" style="margin-top:14px">
       <div class="card pad"><b style="font-size:14px">Imagen térmica (infrarroja)</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">El punto más caliente aparece marcado; la escala de color indica la temperatura.</p>
-        ${m.ir?`<img loading="lazy" src="${m.ir.indexOf('data:')===0?m.ir:'https://raw.githubusercontent.com/vibkaptur78/vibkaptur/main/assets2/termo/'+m.ir}" alt="Termografía" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
+        ${m.ir?`<img loading="lazy" src="${termoSrc(m.ir,c,p)}" alt="Termografía" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
       <div class="card pad"><b style="font-size:14px">Imagen real</b>
         <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Foto del cuadro para localizar físicamente el defecto.</p>
-        ${m.dig?`<img loading="lazy" src="${m.dig.indexOf('data:')===0?m.dig:'https://raw.githubusercontent.com/vibkaptur78/vibkaptur/main/assets2/termo/'+m.dig}" alt="Cuadro" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
+        ${m.dig?`<img loading="lazy" src="${termoSrc(m.dig,c,p)}" alt="Cuadro" style="width:100%;border-radius:10px;border:1px solid var(--line)">`:'<span style="color:var(--muted)">—</span>'}</div>
     </div>`
     : `<div class="card pad" style="margin-top:14px;background:#f8fafc"><b style="font-size:14px">Imágenes</b><p style="color:var(--muted);font-size:12.5px;margin:6px 0 0">Las imágenes térmica y real de este cuadro están en el informe PDF. En la plataforma final se cargarán aquí, como en Zabaldea.</p></div>`;
   return `<main>
@@ -1010,7 +1076,7 @@ function renderMachineTermo(c,p,m){
       <div style="display:flex;gap:18px;font-size:11.5px;color:var(--muted);margin-top:8px">${m.evo.some(e=>e.g!=null)?'<span><span style=\'display:inline-block;width:18px;height:3px;background:#1e6fb0;vertical-align:middle\'></span> Grado (0–10)</span>':''}<span><span style="display:inline-block;width:18px;height:0;border-top:2px ${m.evo.some(e=>e.g!=null)?'dashed':'solid'} #0d9488;vertical-align:middle"></span> Tª máxima (°C)</span></div>
     </div>`:''}
     <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Informe</b><p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Informe de termografía completo en PDF, descargable.</p>
-      <div class="rep"><div class="ic">PDF</div><div class="meta"><b>Informe termografía — ${p.name} · sep. 2026</b><span>25/09/2026</span></div>${dlBtn()}</div>
+      <div class="rep"><div class="ic">PDF</div><div class="meta"><b>Informe termografía — ${p.name}${(p.termo&&p.termo.periodo)?(' · '+p.termo.periodo.replace('-','. 20')):' · sep. 2026'}</b><span>${(p.termo&&p.termo.fecha)||'25/09/2026'}</span></div>${(p.termo&&p.termo.periodo)?((session&&session.canDownload===false)?dlBtn():`<button class="btn ghost sm" onclick="doDownloadTermo('${c.id}','${((c.plants||[]).length>1)?p.id:''}')">Descargar</button>`):dlBtn()}</div>
     </div>
   </main>`;
 }
@@ -1649,6 +1715,14 @@ function renderUpload(){
           <input type="file" id="wordFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
           <button class="btn" style="width:100%" onclick="doUploadWord('${cid}')">🌡️ Subir el Word de termografías</button>
           <div id="upStatusW" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
+          <label style="margin-top:12px;display:block">PDF de termografías — súbelo cuando el Word salga limpio</label>
+          <input type="file" id="termoPdfFile" accept="application/pdf,.pdf" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
+          <button class="btn" style="width:100%" onclick="doUploadTermoPdf('${cid}')">⬆ Subir el PDF de termografías</button>
+          <div id="upStatusTP" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
+          <button class="btn" style="width:100%;margin-top:10px;background:var(--green)" onclick="doPublicarTermo('${cid}',false)">✔ Publicar termografías de ${cn} →</button>
+          <button class="btn ghost sm" style="width:100%;margin-top:6px" onclick="doPublicarTermo('${cid}',true)">Publicar igualmente (con avisos pendientes)</button>
+          <button class="btn ghost sm" style="width:100%;margin-top:6px" onclick="doPublicarTermo('${cid}',false,false,true)">↻ Volver a enviar el resumen de termografías</button>
+          <div id="upStatusTPub" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px">Primero el Word: al subirlo se revisa solo (fechas, grados, defectos, erratas y que sea de este cliente y planta) y te llega el aviso con cada punto. Corrígelo y vuelve a subirlo hasta que salga limpio.</div></div>
         <div style="font-size:11.5px;color:var(--muted);line-height:1.5">Vale subir la carpeta entera del mes. Las máquinas que ese mes salgan como <b>“no medido”</b> se respetan: no puntúan y mantienen su última medida.</div>
       </div>
