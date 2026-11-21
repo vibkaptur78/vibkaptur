@@ -327,6 +327,25 @@ function doUpload(cid){
     else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que tengas permiso de subida y que sea un PDF.'); }
   }).catch(function(){ msg('Error de conexión al subir el PDF.'); });
 }
+function doRevisarTermo(cid){
+  var st=document.getElementById('upStatusW'); function msg(t){ if(st)st.innerHTML=t; }
+  var E=function(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+  fetch('/api/termo.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid,p:upPlantId()})})
+   .then(function(r){return r.json();}).then(function(j){
+     if(!(j&&j.ok)){ msg('Word recibido, pero no se pudo revisar ('+E((j&&j.e)||'error')+').'); return; }
+     var M=j.meta||{}; var sosp=!!(j.destino&&j.destino.sospechoso);
+     var h='<b>'+(j.n>0?('Revisión hecha: '+j.n+' punto(s) a revisar.'):'✔ Revisión correcta. Ya puedes subir el PDF.')+'</b> '+E(M.cuadros||0)+' cuadros · fecha de informe '+E(M.fecha||'—')+'.';
+     if(sosp) h='<span style="color:#b45309"><b>⚠ Posible cliente o planta equivocados.</b></span><br>'+h;
+     if(j.n>0) h+='<ol style="margin:8px 0 0;padding-left:18px">'+j.fallos.map(function(x){return '<li style="margin-bottom:6px"><b>'+E(x.cuadro)+'</b>: '+E(x.problema)+' <span style="color:#0d6b3a">→ '+E(x.sugerencia)+'</span></li>';}).join('')+'</ol>';
+     if(j.info&&j.info.length) h+='<div style="margin-top:8px;color:var(--muted)">Para tu información: '+j.info.map(E).join(' ')+'</div>';
+     msg(h);
+     if(sosp) alert('⚠ Este Word parece de otro cliente o planta.\n\n'+((j.fallos.filter(function(x){return x.cuadro==='Destino';})[0]||{}).problema||'')+'\n\nComprueba el cliente y la planta.');
+     if(j.html){
+       var dest=[session.email,'pedro.ortega@ingenorsistemas.com'].filter(function(e,i,a){return e&&a.indexOf(e)===i;});
+       sendAviso({type:'client',to:dest,subject:j.subject||'VIBKAPTUR - Revisión de termografías',html:j.html}).then(function(res){ toast((j.n>0?('Revisión de termografías: '+j.n+' punto(s).'):'✔ Termografías: revisión correcta.')+((res&&res.ok)?(' Aviso enviado a '+dest.join(' y ')+'.'):' ⚠ El aviso por correo no se pudo enviar.')); });
+     }
+   }).catch(function(){ msg('Word recibido, pero hubo un error de conexión al revisarlo.'); });
+}
 function doUploadWord(cid){
   if(!upReady(cid)) return;
   var inp=document.getElementById('wordFile');
@@ -340,7 +359,7 @@ function doUploadWord(cid){
   msg('Subiendo <b>'+f.name+'</b>…');
   var fd=new FormData(); fd.append('t',session.dlToken); fd.append('c',cid); fd.append('p',upPlantId()); fd.append('file',f);
   fetch('/api/subir.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
-    if(j&&j.ok&&j.kind==='docx'){ msg('✅ Word recibido ('+Math.round(j.bytes/1024)+' KB). Queda <b>pendiente de procesar</b>: se revisa ortografía y congruencia, se extraen las fotos y se montan los cuadros en la planta.'); }
+    if(j&&j.ok&&j.kind==='docx'){ msg('✅ Word recibido ('+Math.round(j.bytes/1024)+' KB). Revisando…'); doRevisarTermo(cid); }
     else if(j&&j.ok){ msg('Subido, pero no se reconoció como Word (.docx).'); }
     else { msg('No se pudo subir ('+((j&&j.e)||'error')+'). Revisa que sea un .docx y que tengas permiso de subida.'); }
   }).catch(function(){ msg('Error de conexión al subir el Word.'); });
@@ -1630,7 +1649,7 @@ function renderUpload(){
           <input type="file" id="wordFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;font-size:13px">
           <button class="btn" style="width:100%" onclick="doUploadWord('${cid}')">🌡️ Subir el Word de termografías</button>
           <div id="upStatusW" style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">El Word lleva dentro los cuadros y sus fotos (térmica + real). Al procesarlo se revisa ortografía y congruencia, se extraen las fotos y se montan los cuadros con su grado, temperatura y evolución.</div></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Primero el Word: al subirlo se revisa solo (fechas, grados, defectos, erratas y que sea de este cliente y planta) y te llega el aviso con cada punto. Corrígelo y vuelve a subirlo hasta que salga limpio.</div></div>
         <div style="font-size:11.5px;color:var(--muted);line-height:1.5">Vale subir la carpeta entera del mes. Las máquinas que ese mes salgan como <b>“no medido”</b> se respetan: no puntúan y mantienen su última medida.</div>
       </div>
       <div class="card pad">
