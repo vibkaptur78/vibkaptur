@@ -103,7 +103,6 @@
   .pick-card.cli .ic{background:var(--steel-soft)}
   .pick-card b{display:block;font-size:15px}
   .pick-card span{color:var(--muted);font-size:12.5px}
-  .demo-note{margin-top:18px;font-size:12px;color:var(--muted);background:#fff;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
 
   /* ---------- Plant cards / counts ---------- */
   .grid{display:grid;gap:14px}
@@ -251,33 +250,9 @@ const AHORRO={
 };
 function costeFallo(){return AHORRO.costeHoraParada*AHORRO.horasParada+AHORRO.repuestos+AHORRO.manoObra+AHORRO.tiempoNoProductivo;}
 function pOf(g){return AHORRO.P[Math.max(0,Math.min(10,g||0))];}
-function ahorroCalc(){
-  const CF=costeFallo();
-  const comp={parada:AHORRO.costeHoraParada*AHORRO.horasParada,repuestos:AHORRO.repuestos,mano:AHORRO.manoObra,tnp:AHORRO.tiempoNoProductivo};
-  let total=0,risk=0,per=[],cTot={parada:0,repuestos:0,mano:0,tnp:0};
-  DATA.clients.forEach(c=>c.plants.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{
-    const g=m.grade||0, pico=Math.max(g,...(m.trend||[]).map(t=>t.g));
-    const dP=Math.max(0,pOf(pico)-pOf(g));
-    const eur=dP*CF;
-    if(eur>0){ total+=eur; per.push({name:a.name+' · '+m.name,pico,g,eur}); for(const k in comp) cTot[k]+=dP*comp[k]; }
-    if(g>=5) risk+=pOf(g)*CF;
-  }))));
-  per.sort((x,y)=>y.eur-x.eur);
-  return {CF,total,risk,per,cTot,n:per.length};
-}
 const eur=n=>'€ '+Math.round(n).toLocaleString('es-ES');
 
 /* ===== Destinatarios de resúmenes por cliente (editable por Ingenor) ===== */
-const CONTACTS_DEFAULT={
-  elis:[
-    {n:'Mantenimiento ELIS',e:'mantenimiento@elis.example',r:'Jefe de Mantenimiento'},
-    {n:'Dirección Técnica',e:'direccion.tecnica@elis.example',r:'Responsable técnico'}
-  ],
-  otua:[
-    {n:'Dirección OTUA',e:'direccion@otua.example',r:'Dirección general'}
-  ]
-};
-let CONTACTS=(function(){ try{const v=localStorage.getItem('ingenor_contacts'); if(v) return JSON.parse(v);}catch(e){} return JSON.parse(JSON.stringify(CONTACTS_DEFAULT)); })();
 let uploadCid='';
 const AVISO_TECNICOS=['tecnico1@ingenorsistemas.com','tecnico2@ingenorsistemas.com','tecnico3@ingenorsistemas.com','tecnico4@ingenorsistemas.com','pedro.ortega@ingenorsistemas.com'];
 const AVISO_CC=['administracion@ingenorsistemas.com'];
@@ -297,20 +272,11 @@ function buildReviewEmailHtml(R){
   const corr=R.corregido.length?`<p style="margin:10px 0 4px"><b>Corregido automáticamente:</b></p><ul>${li(R.corregido.map(c=>c.t+': '+c.d))}</ul>`:`<p style="margin:10px 0 4px"><b>Corregido automáticamente:</b> nada, texto limpio.</p>`;
   return `<div style="font-family:Arial,sans-serif;max-width:560px"><div style="background:#0d2d46;color:#fff;padding:12px 16px;font-weight:bold">INGENOR · VIBKAPTUR — Revisión de informe</div><div style="padding:16px 18px;color:#333"><p>Hola,</p><p>Informe de <b>${R.planta}</b> (${R.tecnica}, ${R.periodo}) subido a la plataforma. ${R.revisar.length?('Publicación con '+R.revisar.length+' punto(s) a revisar.'):'Publicación correcta, sin errores.'}</p>${corr}<p style="margin:12px 0 4px"><b>Para que revises:</b></p><ol>${li(R.revisar.map(w=>w.t+': '+w.d))||'<li>Nada pendiente.</li>'}</ol><p>Cuando des el OK, se publica y le llega el aviso al cliente.</p><p>— VIBKAPTUR · revisión automática</p></div></div>`;
 }
-function saveContacts(){ try{localStorage.setItem('ingenor_contacts',JSON.stringify(CONTACTS));}catch(e){} }
 let DLSTATS=(function(){ try{const v=localStorage.getItem('ingenor_dl'); if(v) return JSON.parse(v);}catch(e){} return {}; })();
 function saveDL(){ try{localStorage.setItem('ingenor_dl',JSON.stringify(DLSTATS));}catch(e){} }
 function recordDownload(cid,who){ if(!cid)return; DLSTATS[cid]=DLSTATS[cid]||{count:0,people:{}}; DLSTATS[cid].count++; DLSTATS[cid].people[who]=(DLSTATS[cid].people[who]||0)+1; DLSTATS[cid].last=new Date().toLocaleString('es-ES'); saveDL(); }
 /* Informe completo: lo sirve la plataforma tras el login, desde una carpeta protegida,
    con un token firmado por el servidor (caduca a las 12h). Técnicos: sin token. */
-function fetchDlToken(email,password,remember){
-  try{
-    fetch('/api/token.php',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:email,password:password})})
-      .then(function(r){return r.json();})
-      .then(function(j){ if(j&&j.ok&&session){ session.dlToken=j.token; setTimeout(tryPendingDL,300); try{ if(remember!==false) localStorage.setItem('vibk_session',JSON.stringify(session)); }catch(e){} } })
-      .catch(function(){});
-  }catch(e){}
-}
 function doUpload(cid){
   if(!upReady(cid)) return;
   var inp=document.getElementById('pdfFile');
@@ -508,7 +474,6 @@ function doRevisar(cid){
    }).catch(function(){ toast('Error de conexión al revisar.'); });
 }
 /* Seguridad al subir: destino siempre visible, planta obligatoria y la comprobación de que el contenido es de ese cliente la hace el servidor al revisar y al publicar */
-function upTok(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().split(' ').filter(function(w){return w.length>=4&&['PLANTA','INFORME','FOODS','NEXT','SISTEMAS','CHEMICAL'].indexOf(w)<0;}); }
 function upBanner(){
   var e=document.getElementById('upDest'); if(!e) return;
   var c=DATA.clients.find(function(x){return x.id===uploadCid;}); if(!c){ e.innerHTML=''; return; }
@@ -664,16 +629,7 @@ function doDownload(){
 function clientName(cid){const c=DATA.clients.find(x=>x.id===cid);return c?c.name:cid;}
 var uploadPid='';
 function setUploadCid(v){uploadCid=v;uploadPid='';render();}
-function addContact(cid){ (CONTACTS[cid]=CONTACTS[cid]||[]).push({n:'',e:'',r:'Destinatario'}); saveContacts(); render(); }
-function rmContact(cid,i){ CONTACTS[cid].splice(i,1); saveContacts(); render(); }
-function setContact(cid,i,k,v){ CONTACTS[cid][i][k]=v; saveContacts(); }
 /* Resumen del informe calculado desde las fichas */
-function emailSummary(cid){
-  let all=[]; DATA.clients.filter(c=>!cid||c.id===cid).forEach(c=>c.plants.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>all.push(Object.assign({area:a.name},m))))));
-  const crit=all.filter(m=>(m.grade||0)>=5).sort((a,b)=>b.grade-a.grade);
-  const counts={bueno:0,seg:0,alerta:0,peligro:0}; all.forEach(m=>counts[m.state]++);
-  return {crit,counts,tot:all.length};
-}
 
 
 /* ============================================================= STATE */
@@ -1093,22 +1049,8 @@ function trendMulti(comps,dates){
   const xl=dates.map((d,i)=>`<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="8.5" text-anchor="middle" fill="#687787">${d}</text>`).join("");
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:400px">${band(7,10,'#dc3545')}${band(5,6,'#f0a500')}${band(3,4,'#9acd32')}${lines}${xl}</svg>`;
 }
-function compLegend(comps){return `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">`+comps.map((c,i)=>`<span style="font-size:12px;display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:${COMPCOL[i%COMPCOL.length]};display:inline-block;border-radius:2px"></span><b>${c.name}</b> <span style="color:var(--muted)">g${c.maxgrade}${c.driver?('·'+c.driver):''}</span></span>`).join("")+`</div>`;}
 function trendDir(c){const s=(c.series||[]).map(z=>z.g!=null?z.g:z.v);if(s.length<2)return '';const d=s[s.length-1]-s[s.length-2];return d>1e-9?'▲ sube':(d<-1e-9?'▼ baja':'→ estable');}
 function sevLegendSide(comps){return `<div style="display:flex;flex-direction:column;gap:10px;min-width:160px;max-width:240px">`+comps.map((c,i)=>{const col=COMPCOL[i%COMPCOL.length];const dir=trendDir(c);const dcol=dir.indexOf('sube')>=0?'#d23b3b':(dir.indexOf('baja')>=0?'#2f6f52':'var(--muted)');const val='grado '+c.maxgrade+(c.driver?(' · '+c.driver):'');return `<div style="display:flex;align-items:center;gap:9px;font-size:12.5px"><span style="width:16px;height:16px;background:${col};display:inline-flex;align-items:center;border-radius:4px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.08)"><span style="width:100%;height:3px;background:rgba(255,255,255,.75)"></span></span><span style="line-height:1.3"><b style="color:${col}">${c.name}</b><br><span style="color:var(--muted);font-size:11px">${val}${dir?(' · <span style="color:'+dcol+'">'+dir+'</span>'):''}</span></span></div>`;}).join("")+`</div>`;}
-function compRmsChart(comps,labels){
-  const W=520,H=160,pL=40,pR=14,pT=14,pB=24,n=labels.length;
-  const all=[].concat(...comps.map(c=>c.series.map(s=>s.v))); const mx=Math.max(1,...all), top=mx*1.18;
-  const X=i=>pL+(n<=1?(W-pL-pR)/2:i*(W-pL-pR)/(n-1)), Y=v=>pT+(1-v/top)*(H-pT-pB);
-  let g=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;font-size:10px">`;
-  for(let k=0;k<=3;k++){const v=top*k/3,y=Y(v);g+=`<line x1="${pL}" y1="${y.toFixed(1)}" x2="${W-pR}" y2="${y.toFixed(1)}" stroke="#eef2f6"/><text x="6" y="${(y+3).toFixed(1)}" fill="#9aa7b4">${v.toFixed(1)}</text>`;}
-  labels.forEach((q,i)=>{g+=`<text x="${X(i).toFixed(1)}" y="${H-7}" text-anchor="middle" fill="#9aa7b4">${q}</text>`;});
-  comps.forEach((c,ci)=>{const col=COMPCOL[ci%COMPCOL.length];const pts=c.series.map(s=>({i:labels.indexOf(s.d),v:s.v})).filter(p=>p.i>=0);if(!pts.length)return;
-    const d=pts.map((p,j)=>`${j?'L':'M'}${X(p.i).toFixed(1)} ${Y(p.v).toFixed(1)}`).join(' ');
-    g+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="2.4"/>`;
-    pts.forEach(p=>{g+=`<circle cx="${X(p.i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="3.1" fill="${col}"/>`;});
-    const L=pts[pts.length-1];g+=`<text x="${(X(L.i)-5).toFixed(1)}" y="${(Y(L.v)-6).toFixed(1)}" text-anchor="end" fill="${col}" font-weight="700">${L.v.toFixed(1)}</text>`;});
-  g+=`</svg>`;return g;}
 function rmsChart(rms){
   if(!rms||rms.length<2) return "";
   const W=380,H=150,pad=34,n=rms.length;
@@ -1194,49 +1136,6 @@ function termoEvo(evo){
   const tdots=evo.map((e,i)=>e.t!=null?`<circle cx="${x(i).toFixed(1)}" cy="${yT(e.t).toFixed(1)}" r="${hasG?2.6:3.4}" fill="${tcol}"/><text x="${x(i).toFixed(1)}" y="${(yT(e.t)+(hasG?13:-8)).toFixed(1)}" font-size="${hasG?8:9}" text-anchor="middle" fill="${tcol}">${e.t}°</text>`:"").join("");
   const xl=evo.map((e,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="8.5" text-anchor="middle" fill="#687787">${e.q}</text>`).join("");
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:400px">${bands}${gline}${tline}${gdots}${tdots}${xl}</svg>`;
-}
-function vibMachinesOf(PL){const out=[];PL.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{if(m.vib)out.push(Object.assign({plant:p.name,pid:p.id},m));})));return out;}
-function renderVibStats(PL){
-  const vm=vibMachinesOf(PL); if(!vm.length) return '';
-  const cnt=st=>vm.filter(m=>m.state===st).length;
-  const watch=vm.filter(m=>m.grade>=5).sort((a,b)=>b.grade-a.grade);
-  let out=`<div style="margin:22px 0 10px;border-top:2px solid var(--line);padding-top:16px"><h2 style="font-size:17px;margin:0 0 2px">Vibraciones · máquinas</h2><p style="color:var(--muted);font-size:12.5px;margin:0">Severidad de las máquinas analizadas por vibraciones (sep. 2026).</p></div>
-    <div class="grid c2" style="grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--navy)">${vm.length}</div><small style="color:var(--muted)">Máquinas analizadas</small></div>
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#2f6f52">${cnt('bueno')}</div><small style="color:var(--muted)">En buen estado</small></div>
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#e08a00">${cnt('seg')+cnt('alerta')}</div><small style="color:var(--muted)">En seguimiento/alerta</small></div>
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#d23b3b">${cnt('peligro')}</div><small style="color:var(--muted)">En peligro</small></div>
-    </div>
-    <div class="card" style="margin-bottom:16px"><div class="pad"><b style="font-size:14px">Resumen por planta</b></div>
-    <table><thead><tr><th>Planta</th><th>Máquinas</th><th>Bueno</th><th>Segui.</th><th>Alerta</th><th>Peligro</th></tr></thead><tbody>`;
-  PL.forEach(p=>{const ms=[];p.areas.forEach(a=>a.machines.forEach(m=>{if(m.vib)ms.push(m);}));if(!ms.length)return;
-    const c=st=>ms.filter(m=>m.state===st).length;
-    out+=`<tr style="cursor:pointer" onclick="go({name:'plant',cid:'${vm[0]?'':''}'||view.cid,pid:'${p.id}'})"><td><b>${p.name.replace('Planta ','')}</b></td><td>${ms.length}</td><td style="color:#2f6f52">${c('bueno')}</td><td style="color:#8a9a00">${c('seg')}</td><td style="color:#e08a00">${c('alerta')}</td><td style="color:#d23b3b">${c('peligro')}</td></tr>`;});
-  out+=`</tbody></table></div>`;
-  if(watch.length){out+=`<div class="card"><div class="pad"><b style="font-size:14px">Máquinas a vigilar (grado ≥5)</b><p style="color:var(--muted);font-size:12px;margin:4px 0 0">Ordenadas por severidad. Son las que necesitan intervención o seguimiento estrecho.</p></div>
-    <table><thead><tr><th>Máquina</th><th>Planta</th><th>Severidad</th><th>Estado</th><th>Recomendación</th></tr></thead><tbody>`;
-    watch.slice(0,14).forEach(m=>{out+=`<tr style="cursor:pointer" onclick="go({name:'machine',cid:'${m.pid?view.cid:view.cid}',pid:'${m.pid}',mid:'${m.id}'})"><td><b>${m.name}</b></td><td style="color:var(--muted);font-size:12px">${m.plant.replace('Planta ','')}</td><td><b style="color:${gradeCol(m.grade)}">Grado ${m.grade}/10</b></td><td>${pill(m.state)}</td><td style="color:var(--steel);font-size:12px">${m.recomendacion||'—'} →</td></tr>`;});
-    out+=`</tbody></table></div>`;}
-  return out;
-}
-function renderVibDash(PL){
-  const vm=vibMachinesOf(PL); if(!vm.length) return '';
-  const cnt=st=>vm.filter(m=>m.state===st).length;
-  const tot=vm.length; const segd=[["#1f9d55",cnt('bueno')],["#9acd32",cnt('seg')],["#f0a500",cnt('alerta')],["#dc3545",cnt('peligro')]];
-  let acc=0,stops=[];segd.forEach(([col,v])=>{const a=acc/tot*360,b=(acc+v)/tot*360;if(v)stops.push(`${col} ${a.toFixed(1)}deg ${b.toFixed(1)}deg`);acc+=v;});
-  const donut=`<div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(${stops.join(",")});position:relative;flex:none"><div style="position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center"><b style="font-size:26px;line-height:1">${tot}</b><small style="color:var(--muted)">máquinas</small></div></div>`;
-  const worst=vm.slice().sort((a,b)=>b.grade-a.grade); const focus=worst.find(m=>m.evo&&m.evo.length>=2);
-  let rows=worst.slice(0,8).map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="go({name:'machine',cid:'${view.cid}',pid:'${m.pid}',mid:'${m.id}'})"><div style="flex:1"><b style="font-size:13px">${m.name}</b> <span style="color:var(--muted);font-size:12px">· ${m.plant.replace('Planta ','')}</span></div><b style="color:${gradeCol(m.grade)}">Grado ${m.grade}</b>${pill(m.state)}<span style="color:var(--steel);font-weight:700">→</span></div>`).join("");
-  return `<div style="margin:22px 0 10px;border-top:2px solid var(--line);padding-top:16px"><h2 style="font-size:17px;margin:0 0 2px">Vibraciones</h2><p style="color:var(--muted);font-size:12.5px;margin:0">Severidad de las máquinas por vibraciones.</p></div>
-    <div class="two-col">
-      <div class="card pad"><b style="font-size:14px">Reparto de equipos por estado</b>
-        <div style="display:flex;gap:18px;align-items:center;margin-top:12px">${donut}
-          <div style="font-size:13px;line-height:1.9"><div><span class="dot d-bueno"></span>Bueno · ${cnt('bueno')}</div><div><span class="dot d-seg"></span>Seguimiento · ${cnt('seg')}</div><div><span class="dot d-alerta"></span>Atención · ${cnt('alerta')}</div><div><span class="dot d-peligro"></span>Peligro · ${cnt('peligro')}</div></div></div></div>
-      <div class="card pad"><b style="font-size:14px">Máquinas a vigilar</b><div style="margin-top:8px">${rows}</div></div>
-    </div>
-    ${focus?`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Foco: ${focus.name} · ${focus.plant.replace('Planta ','')}</b>
-      <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Evolución de severidad de la máquina más crítica.</p>${termoEvo(focus.evo)}
-      <div style="font-size:11.5px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:18px;height:3px;background:#1e6fb0;vertical-align:middle"></span> Grado de severidad (0–10)</div></div>`:''}`;
 }
 
 /* ===== OTUA en formato ELIS (vibraciones primero, luego termografía) ===== */
@@ -1495,167 +1394,6 @@ function renderOtuaView(mode){
   out+=`</main>`; return out;
 }
 
-function renderStatsTermo(){
-  const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||curClient||DATA.clients[0].id):session.clientId));
-  const PL=scopedPlants(c); const allM=[]; PL.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{if(m.tmax!==undefined)allM.push(Object.assign({plant:p.name,pid:p.id,area:a.name},m));})));
-  const n=s=>allM.filter(m=>m.state===s).length;
-  const tot=allM.length, bueno=n('bueno'), seg=n('seg'), alerta=n('alerta'), peligro=n('peligro');
-  const pbueno=Math.round(bueno/tot*100);
-  const hot=allM.slice().sort((a,b)=>parseFloat(b.tmax)-parseFloat(a.tmax))[0];
-  // watch list: alerta/peligro + grade>=3
-  const watch=allM.filter(m=>m.state==='alerta'||m.state==='peligro'||(m.grade&&m.grade>=3)).sort((a,b)=>parseFloat(b.tmax)-parseFloat(a.tmax));
-  let out=`<main>
-    <div class="hero" style="background-image:linear-gradient(90deg,rgba(9,29,46,.9),rgba(9,29,46,.25)),url('assets2/plant-elis.jpg')">
-      <div class="hero-in"><div class="hero-sub">${c.name} · Campaña termográfica sep. 2026</div><h1>Estadísticas</h1></div></div>
-    <div class="grid c2" style="grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--navy)">${tot}</div><small style="color:var(--muted)">Cuadros revisados</small></div>
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#2f6f52">${pbueno}%</div><small style="color:var(--muted)">En buen estado</small></div>
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#e08a00">${seg+alerta+peligro}</div><small style="color:var(--muted)">Con calentamiento</small></div>
-      <div class="card pad" style="text-align:center"><div style="font-size:26px;font-weight:800;color:#d23b3b">${hot?parseFloat(hot.tmax).toFixed(0)+'°':'—'}</div><small style="color:var(--muted)">Tª máx (${hot?hot.plant.replace('Planta ',''):''})</small></div>
-    </div>`;
-  // per-plant table
-  out+=`<div class="card" style="margin-bottom:16px"><div class="pad"><b style="font-size:14px">Resumen por planta</b></div>
-    <table><thead><tr><th>Planta</th><th>Cuadros</th><th>Bueno</th><th>Segui.</th><th>Alerta</th><th>Tª máx</th></tr></thead><tbody>`;
-  PL.forEach(p=>{
-    const ms=[]; p.areas.forEach(a=>a.machines.forEach(m=>{if(m.tmax!==undefined)ms.push(m);}));
-    const cnt=st=>ms.filter(m=>m.state===st).length;
-    if(!ms.length)return; const tmx=Math.max.apply(null,ms.map(m=>parseFloat(m.tmax)||0));
-    out+=`<tr style="cursor:pointer" onclick="go({name:'plant',cid:'${c.id}',pid:'${p.id}'})"><td><b>${p.name.replace('Planta ','')}</b></td><td>${ms.length}</td><td style="color:#2f6f52">${cnt('bueno')}</td><td style="color:#8a9a00">${cnt('seg')}</td><td style="color:#d23b3b">${cnt('alerta')+cnt('peligro')}</td><td><b>${tmx.toFixed(1)}°C</b></td></tr>`;
-  });
-  out+=`</tbody></table></div>`;
-  // watch list
-  out+=`<div class="card" style="margin-bottom:16px"><div class="pad"><b style="font-size:14px">Cuadros a vigilar</b><p style="color:var(--muted);font-size:12px;margin:4px 0 0">Ordenados por temperatura máxima. Son los puntos donde conviene actuar o seguir de cerca.</p></div>
-    <table><thead><tr><th>Cuadro</th><th>Planta · Área</th><th>Tª máx</th><th>Estado</th><th>Defecto</th></tr></thead><tbody>`;
-  watch.slice(0,12).forEach(m=>{
-    const tc=parseFloat(m.tmax)>=80?'#d23b3b':parseFloat(m.tmax)>=65?'#e08a00':'#2f6f52';
-    out+=`<tr style="cursor:pointer" onclick="go({name:'machine',cid:'${c.id}',pid:'${m.pid}',mid:'${m.id}'})"><td><b>${m.name}</b></td><td style="color:var(--muted);font-size:12px">${m.plant.replace('Planta ','')} · ${m.area}</td><td style="color:${tc}"><b>${m.tmax}°C</b></td><td>${pill(m.state)}</td><td style="color:var(--steel);font-size:12px">${m.defecto||'—'} <b>→</b></td></tr>`;
-  });
-  out+=`</tbody></table></div>`;
-  // Zabaldea quarterly control
-  const zab=PL.find(p=>p.id==='zabaldea');
-  if(zab){
-    const zm=[]; zab.areas.forEach(a=>a.machines.forEach(m=>{if(m.tmax!==undefined)zm.push(m);}));
-    const withEvo=zm.filter(m=>m.evo);
-    if(withEvo.length){
-      const qs=withEvo[0].evo.map(e=>e.q);
-      const rows=qs.map((q,qi)=>{
-        const grades=withEvo.map(m=>m.evo[qi].g);
-        return {q, bueno:grades.filter(g=>g<=2).length, seg:grades.filter(g=>g>=3&&g<=4).length, alerta:grades.filter(g=>g>=5).length, maxg:Math.max.apply(null,grades)};
-      });
-      // count cuadros that worsened may->sep
-      const worse=withEvo.filter(m=>{const e=m.evo;return e[e.length-1].g>e[e.length-2].g;}).length;
-      out+=`<div class="card pad"><b style="font-size:14px">Control trimestral · Zabaldea</b>
-        <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Reparto de los 16 cuadros por estado en cada inspección. Permite ver si la planta mejora o empeora.</p>
-        <table style="font-size:12.5px"><thead><tr><th>Trimestre</th><th style="color:#2f6f52">Bueno (1–2)</th><th style="color:#8a9a00">Seguim. (3–4)</th><th style="color:#d23b3b">Alerta (5–10)</th></tr></thead><tbody>`;
-      rows.forEach(r=>{out+=`<tr><td><b>${r.q}</b></td><td>${r.bueno}</td><td>${r.seg}</td><td>${r.alerta}</td></tr>`;});
-      out+=`</tbody></table>
-        <div class="adm-banner" style="margin-top:12px">📈 <div>En la última inspección, <b>${worse} cuadro(s)</b> han subido de grado respecto al trimestre anterior. El foco está en <b>REDWAVE</b>, cuyos cuadros 1–3 han pasado de satisfactorio a seguimiento con la temperatura subiendo por encima de 74 °C.</div></div>
-      </div>`;
-    }
-  }
-  out+=renderVibStats(PL);
-  const SVO=savingsOtua(PL); const POTO=savPotentialOtua(PL);
-  out+=`<div class="card pad" style="border-left:4px solid #2f6f52;margin-top:16px">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:15px">Ahorro económico estimado</b><span style="font-size:11px;color:var(--muted)">estimación Ingenor · conservadora</span></div>
-    <div style="background:#e8f3ec;border-radius:12px;padding:14px 20px;display:inline-block;margin:6px 0 4px"><div style="font-size:26px;font-weight:800;color:#2f6f52;line-height:1">${eur(SVO.yr)}</div><div style="font-size:11px;color:#1f6f47;margin-top:3px">ahorro realizado · acumulado 2026</div></div>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0">Averías/puntos calientes detectados y <b>ya corregidos</b> (han bajado de grado o de temperatura), evitando la parada. Suma de todas las bajadas del año.</p>
-    ${SVO.perPlant.length>1?`<table style="margin-top:12px;font-size:12.5px"><thead><tr><th>Planta</th><th style="text-align:right">Realizado 2026</th></tr></thead><tbody>${SVO.perPlant.map(x=>`<tr><td><b>${x.name}</b></td><td style="text-align:right">${eur(x.yr)}</td></tr>`).join('')}</tbody></table>`:''}
-    ${POTO.items.length?`<div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:12px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px"><b style="font-size:14px;color:#b45309">⚠ Fallos potenciales detectados</b><span style="font-size:12px;color:#92400e">${POTO.items.length} equipos · potencial ${eur(POTO.total)}</span></div>
-      <p style="font-size:11.5px;color:var(--muted);margin:4px 0 8px">Detectados a tiempo pero <b>aún por corregir</b>: todavía no cuentan como ahorro realizado, pero al actuar se <b>evita la parada y el fallo catastrófico</b>.</p>
-      ${POTO.items.slice(0,10).map(it=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f1f1f1;font-size:12.5px"><div><span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:10px">${it.label}</span> ${it.name}</div><div style="color:#334;white-space:nowrap">potencial <b>${eur(it.val)}</b></div></div>`).join('')}
-    </div>`:''}
-    <p style="font-size:11px;color:var(--muted);margin:12px 0 0">Método: a cada bajada (realizado) y a cada fallo potencial detectado (pendiente) se le asigna probabilidad de fallo × sobrecoste de una parada no planificada por clase de equipo (banda metal/reciclaje). Rangos basados en estudios publicados (Siemens, McKinsey, Deloitte, benchmarks sectoriales).</p>
-  </div>`;
-  out+=`</main>`;
-  return out;
-}
-function renderDashTermo(){
-  const c=DATA.clients.find(x=>x.id===(staff()?(view.cid||curClient||DATA.clients[0].id):session.clientId));
-  const PL=scopedPlants(c); const allM=[]; PL.forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>{if(m.tmax!==undefined)allM.push(Object.assign({plant:p.name,pid:p.id,area:a.name},m));})));
-  const cnt=st=>allM.filter(m=>m.state===st).length;
-  const tot=allM.length,bueno=cnt('bueno'),seg=cnt('seg'),alerta=cnt('alerta'),peligro=cnt('peligro');
-  const segd=[["#1f9d55",bueno],["#9acd32",seg],["#f0a500",alerta],["#dc3545",peligro]];
-  let acc=0,stops=[];segd.forEach(([col,v])=>{const a=acc/tot*360,b=(acc+v)/tot*360;if(v)stops.push(`${col} ${a.toFixed(1)}deg ${b.toFixed(1)}deg`);acc+=v;});
-  const donut=`<div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(${stops.join(",")});position:relative;flex:none"><div style="position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center"><b style="font-size:26px;line-height:1">${tot}</b><small style="color:var(--muted)">cuadros</small></div></div>`;
-  const typ=d=>{d=(d||'').toLowerCase();if(!d||d.includes('no se detectan'))return'Sin anomalía';if(d.includes('moderado'))return'Calentamiento moderado';if(d.includes('leve'))return'Calentamiento leve';return'Otros defectos';};
-  const order=['Sin anomalía','Calentamiento leve','Calentamiento moderado','Otros defectos'];
-  const colr={'Sin anomalía':'#1f9d55','Calentamiento leve':'#9acd32','Calentamiento moderado':'#e08a00','Otros defectos':'#8a97a4'};
-  const types={}; allM.forEach(m=>{const t=typ(m.defecto);types[t]=(types[t]||0)+1;});
-  const tmaxT=Math.max.apply(null,order.map(k=>types[k]||0));
-  const bars=order.filter(k=>types[k]).map(k=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${k}</span><b>${types[k]}</b></div><div style="background:#eef3f8;border-radius:6px;height:12px"><div style="width:${(types[k]/tmaxT*100).toFixed(0)}%;height:12px;border-radius:6px;background:${colr[k]}"></div></div></div>`).join("");
-  const hot=allM.slice().sort((a,b)=>parseFloat(b.tmax)-parseFloat(a.tmax)).slice(0,8);
-  let hotrows=hot.map(m=>{const tc=parseFloat(m.tmax)>=80?'#d23b3b':parseFloat(m.tmax)>=65?'#e08a00':'#2f6f52';return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="go({name:'machine',cid:'${c.id}',pid:'${m.pid}',mid:'${m.id}'})"><div style="flex:1"><b style="font-size:13px">${m.name}</b> <span style="color:var(--muted);font-size:12px">· ${m.plant.replace('Planta ','')} · ${m.area}</span></div><b style="color:${tc};white-space:nowrap">${m.tmax}°C</b>${pill(m.state)}<span style="color:var(--steel);font-weight:700">→</span></div>`;}).join("");
-  // focus evolution: worst Zabaldea cuadro by last grade
-  const zab=PL.find(p=>p.id==='zabaldea'); let focus=null;
-  if(zab){const zm=[];zab.areas.forEach(a=>a.machines.forEach(m=>{if(m.evo)zm.push(Object.assign({area:a.name},m));}));focus=zm.sort((a,b)=>b.evo[b.evo.length-1].g-a.evo[a.evo.length-1].g)[0];}
-  const withC=allM.filter(m=>m.state!=='bueno').length;
-  return `<main>
-    <h1>Análisis — ${c.name}</h1>
-    <p class="sub">Termografía de cuadros eléctricos. ${tot} cuadros en ${PL.length} plantas, ${withC} con algún calentamiento.</p>
-    <div class="kpi">
-      <div class="card k"><b>${PL.length}</b><small>Plantas</small></div>
-      <div class="card k"><b>${tot}</b><small>Cuadros revisados</small></div>
-      <div class="card k"><b style="color:var(--g-alerta)">${seg+alerta+peligro}</b><small>Con calentamiento</small></div>
-      <div class="card k"><b style="color:var(--g-peligro)">${alerta+peligro}</b><small>A actuar (moderado+)</small></div>
-    </div>
-    <div class="two-col">
-      <div class="card pad"><b style="font-size:14px">Reparto de cuadros por estado</b>
-        <div style="display:flex;gap:18px;align-items:center;margin-top:12px">${donut}
-          <div style="font-size:13px;line-height:1.9">
-            <div><span class="dot d-bueno"></span>Bueno · ${bueno}</div>
-            <div><span class="dot d-seg"></span>Seguimiento · ${seg}</div>
-            <div><span class="dot d-alerta"></span>Atención · ${alerta}</div>
-            <div><span class="dot d-peligro"></span>Peligro · ${peligro}</div>
-          </div></div></div>
-      <div class="card pad"><b style="font-size:14px">Defectos por tipo</b>
-        <div style="margin-top:12px">${bars}</div>
-        <div style="font-size:11px;color:var(--muted)">Clasificación térmica del defecto detectado en cada cuadro (sep. 2026).</div></div>
-    </div>
-    <div class="two-col" style="margin-top:14px">
-      <div class="card pad"><b style="font-size:14px">Cuadros más calientes</b><div style="margin-top:8px">${hotrows}</div></div>
-      ${focus?`<div class="card pad"><b style="font-size:14px">Foco: ${focus.name} · ${focus.area} (Zabaldea)</b>
-        <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Evolución de grado y temperatura del cuadro más crítico.</p>
-        ${termoEvo(focus.evo)}
-        <div style="display:flex;gap:18px;font-size:11.5px;color:var(--muted);margin-top:8px"><span><span style="display:inline-block;width:18px;height:3px;background:#1e6fb0;vertical-align:middle"></span> Grado</span><span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #0d9488;vertical-align:middle"></span> Tª máx (°C)</span></div></div>`:''}
-    </div>
-    ${renderVibDash(PL)}
-  </main>`;
-}
-function renderMachineVib(c,p,m){
-  const anomalia=m.grade>2;
-  return `<main>
-    <div class="crumbs"><span onclick="go({name:'plants'})">${staff()?'Plantas':'Mis plantas'}</span> › <span onclick="go({name:'plant',cid:'${view.cid}',pid:'${view.pid}'})">${p.name}</span> › <b>${m.name}</b></div>
-    <div class="m-head"><div><h1>${m.name}</h1><p class="sub">${p.name} · Vibraciones</p></div></div>
-    <div class="m-states">
-      <div class="state-box"><small>Estado</small>${pill(m.state)}</div>
-      <div class="state-box"><small>Severidad</small><b style="color:${gradeCol(m.grade)}">Grado ${m.grade}/10</b></div>
-      <div class="state-box"><small>Inspección</small><b>${m.insp}</b></div>
-    </div>
-    <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Diagnóstico</b>
-      <div style="margin-top:8px;font-size:13px;line-height:1.8">
-        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0"><span>Severidad máxima</span><b style="color:${gradeCol(m.grade)}">Grado ${m.grade}/10 · ${STATES[m.state].label}</b></div>
-        <div style="display:flex;justify-content:space-between;padding:7px 0"><span>Recomendación</span><b style="color:${anomalia?'#b06f00':'#2f6f52'}">${m.recomendacion||'No requiere intervención'}</b></div>
-      </div>
-    </div>
-    ${(m.fen&&Object.keys(m.fen).length)?`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Diagnóstico por fenómeno</b>
-      <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Severidad de cada fenómeno vibratorio detectado en la máquina (0–10).</p>
-      <div style="margin-top:4px">${Object.keys(m.fen).sort((a,b)=>m.fen[b]-m.fen[a]).map(k=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${k}</span><b style="color:${gradeCol(m.fen[k])}">${m.fen[k]}/10</b></div><div style="background:#eef3f8;border-radius:6px;height:11px"><div style="width:${m.fen[k]*10}%;height:11px;border-radius:6px;background:${gradeCol(m.fen[k])}"></div></div></div>`).join('')}</div>
-    </div>`:''}
-    ${(m.pts&&m.pts.length)?`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Puntos de medida ${m.maxrms?`· global <span style="color:${m.maxrms>=7?'#d23b3b':m.maxrms>=4.5?'#e08a00':'#2f6f52'}">${m.maxrms} mm/s</span>`:''}</b>
-      <p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Valor eficaz de vibración (RMS, mm/s) en cada punto medido.</p>
-      <table style="font-size:12.5px"><thead><tr><th>Punto</th><th style="text-align:right">mm/s</th></tr></thead><tbody>${m.pts.map(p=>`<tr><td>${p[0]}</td><td style="text-align:right"><b style="color:${p[1]>=7?'#d23b3b':p[1]>=4.5?'#e08a00':'#2f6f52'}">${p[1]}</b></td></tr>`).join('')}</tbody></table>
-    </div>`:''}
-    ${(m.evo&&m.evo.length>=2)?`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Evolución de severidad (últimas ${m.evo.length} medidas)</b>
-      <p style="color:var(--muted);font-size:12px;margin:4px 0 10px">Grado del defecto más significativo en sus últimas inspecciones. No todas las máquinas se miden cada mes.</p>
-      ${termoEvo(m.evo)}
-      <div style="font-size:11.5px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:18px;height:3px;background:#1e6fb0;vertical-align:middle"></span> Grado de severidad (0–10)</div>
-    </div>`:''}
-    <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Informe</b><p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Ficha de vibraciones con espectros y tendencia, en el informe completo.</p>
-      ${curRepRow(c,p,'vib','Informe vibraciones — '+p.name)}
-    </div>
-  </main>`;
-}
 function adaptVibElis(m,p){
   const grd=m.grade||2;
   const estadoFor=g=> g>=7?'PELIGRO - EFECTO GRAVE':(g>=5?'ATENCIÓN - EFECTO SIGNIFICATIVO':(g>=3?'SATISFACTORIO - EFECTO LEVE':'SATISFACTORIO - EFECTO MENOR'));
@@ -1780,7 +1518,6 @@ function renderUpload(){
   const plantOpts=(_multi?`<option value="" ${uploadPid?'':'selected'}>— Elige la planta —</option>`:'')+cl.plants.map(p=>`<option value="${p.id}" ${p.id===uploadPid?'selected':''}>${p.name}</option>`).join('');
   const _pSel=cl.plants.find(p=>p.id===uploadPid);
   const _dest=`Vas a subir a: <b style="font-size:17px">${cl.name}${_multi?(' · '+(_pSel?_pSel.name:'<span style="color:#b45309">elige la planta</span>')):''}</b>`;
-  const rec=CONTACTS[cid]||[];
   return `<main>
     <div class="crumbs"><b>Subir informe</b></div>
     <h1>Subir informe de inspección</h1>
@@ -1867,22 +1604,6 @@ function renderUpload(){
 }
 
 /* ============================================================= ADMIN: USERS */
-const USER_LIST=[
-  {e:"admin@ingenorsistemas.com",n:"Ingenor · Administrador"},
-  {e:"pedro.ortega@ingenorsistemas.com",n:"Pedro Ortega · Ingenor"},
-  {e:"administracion@ingenorsistemas.com",n:"Administración · Ingenor"},
-  {e:"tecnico@ingenorsistemas.com",n:"Ingenor · Técnico"},
-  {e:"tecnico1@ingenorsistemas.com",n:"Técnico 1 · Ingenor"},
-  {e:"tecnico2@ingenorsistemas.com",n:"Técnico 2 · Ingenor"},
-  {e:"tecnico3@ingenorsistemas.com",n:"Técnico 3 · Ingenor"},
-  {e:"tecnico4@ingenorsistemas.com",n:"Técnico 4 · Ingenor"},
-  {e:"direccion@otua.com",n:"OTUA · Dirección"},
-  {e:"zabaldea@otua.com",n:"OTUA · Zabaldea"},
-  {e:"refial@otua.com",n:"OTUA · Refial"},
-  {e:"resal@otua.com",n:"OTUA · Resal"},
-  {e:"reydesa@otua.com",n:"OTUA · Reydesa"},
-  {e:"direccion@elis.com",n:"ELIS · Dirección"}
-];
 function doResetPass(){
   const sel=document.getElementById('resetEmail'); const email=(sel&&sel.value||'').trim().toLowerCase();
   const np=(document.getElementById('resetNew').value||'').trim();
@@ -1974,7 +1695,7 @@ function renderDest(inp){
 function renderUsers(){
   if(USERS_SRV===null){ loadUsers(); }
   const L=USERS_SRV||[];
-  const opts=(L.length?L.map(function(u){return {e:u.email,n:u.name||u.email};}):USER_LIST).map(function(u){return '<option value="'+uEsc(u.e)+'">'+uEsc(u.n)+' — '+uEsc(u.e)+'</option>';}).join('');
+  const opts=(L.length?L.map(function(u){return {e:u.email,n:u.name||u.email};}):[]).map(function(u){return '<option value="'+uEsc(u.e)+'">'+uEsc(u.n)+' — '+uEsc(u.e)+'</option>';}).join('');
   const inp='width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:9px;font-size:13px';
   const cliOpts='<option value="">— Elige cliente —</option>'+DATA.clients.map(function(c){return '<option value="'+uEsc(c.id)+'">'+uEsc(c.name)+'</option>';}).join('');
   const cname=function(u){ const c=DATA.clients.find(function(x){return x.id===u.c;}); if(!c) return u.c||''; const p=u.plant?(c.plants||[]).find(function(x){return x.id===u.plant;}):null; return c.name+(p?(' · '+p.name):''); };
@@ -2123,9 +1844,6 @@ function savClass(n){n=(n||'').toLowerCase();
   if(n.trim()==='motor')return'motor';
   return'turbina';}
 function savP(g){return g>=6?0.80:(g===5?0.50:(g===4?0.20:0));}
-function savHistG(m){var h=m.trend||m.evo||[],r=[];h.forEach(function(x){if(x.g!=null)r.push(x.g);});return r;}
-function savImproved(m){var g=savHistG(m);return g.length>=2&&g[g.length-1]<g[g.length-2];}
-function savTempImproved(m){var h=m.evo||[],r=[];h.forEach(function(x){if(x.t!=null)r.push(x.t);});return r.length>=2&&r[r.length-1]<r[r.length-2];}
 function savY(x){return (x||'').indexOf('26')>=0;}
 /* ===== Modelo de ahorro por RIESGO EVITADO (aprobado): reduccion de prob. de fallo x coste, 12 meses ===== */
 /* Baremo de probabilidad de fallo por grado de severidad (criterio de Ingenor, fijado por Pedro el 19/11/2026) */
@@ -2249,61 +1967,7 @@ function savPotential(c){
 }
 /* ===== Modelo de ahorro OTUA (metal/reciclaje: vibraciones + termografía, con acumulado del año) ===== */
 const SAVO_T=10000;
-function savoDvib(n){n=(n||'').toLowerCase();
-  if(n.indexOf('molino')>=0)return 20000;
-  if(n.indexOf('horno')>=0||n.indexOf('acciona')>=0)return 18000;
-  if(n.indexOf('fragmentadora')>=0)return 15000;
-  if(n.indexOf('motoreductor')>=0||n.indexOf('reductora')>=0)return 16000;
-  if(n.indexOf('bomba')>=0)return 9000;
-  return 8000;}
-function savoPvib(g){return g>=6?0.80:(g===5?0.50:(g===4?0.20:0));}
-function savoPtemp(t){t=parseFloat(t);return isNaN(t)?0:(t>=85?0.60:(t>=70?0.40:0));}
-function savo2026(q){return (q||'').indexOf('26')>=0;}
-function savingsOtua(PL){
-  let cur=0,yr=0;const perPlant=[];
-  (PL||[]).forEach(p=>{let pc=0,py=0;
-    p.areas.forEach(a=>a.machines.forEach(m=>{
-      const isvib=(m.tmax===undefined||m.tmax===null||m.tmax==='')&&(m.grade!=null);
-      const ev=m.evo||[];
-      if(isvib){const d=savoDvib(m.name);
-        // Solo bajadas: cada vez que el grado baja respecto a la medición anterior, una vez.
-        for(let i=1;i<ev.length;i++){const gf=ev[i-1].g,gt=ev[i].g;
-          if(gf==null||gt==null)continue;
-          if(gt<gf && gf>=4 && savo2026(ev[i].q)){const v=savoPvib(gf)*d;py+=v;if(i===ev.length-1)pc+=v;}}
-      }else{const d=SAVO_T;
-        // Solo bajadas de temperatura desde un calentamiento relevante (>=70 °C).
-        for(let i=1;i<ev.length;i++){const tf=ev[i-1].t,tt=ev[i].t;
-          if(tf==null||tt==null)continue;
-          if(tt<tf && savoPtemp(tf)>0 && savo2026(ev[i].q)){const v=savoPtemp(tf)*d;py+=v;if(i===ev.length-1)pc+=v;}}
-      }
-    }));
-    perPlant.push({name:p.name.replace('Planta ',''),cur:pc,yr:py});cur+=pc;yr+=py;
-  });
-  return {cur:cur,yr:yr,perPlant:perPlant};
-}
 /* Fallos potenciales detectados OTUA: vibraciones grado>=5 o cuadros >=85C que AUN no han bajado. */
-function savPotentialOtua(PL){
-  var total=0, items=[];
-  (PL||[]).forEach(function(p){p.areas.forEach(function(a){a.machines.forEach(function(m){
-    var isvib=(m.tmax===undefined||m.tmax===null||m.tmax==='')&&(m.grade!=null);
-    var ev=m.evo||[];
-    if(isvib){var g=m.grade||0; if(g<5) return;
-      var dr=false; var gs=ev.filter(function(e){return e.g!=null;});
-      if(gs.length>=2) dr=gs[gs.length-1].g<gs[gs.length-2].g;
-      if(dr) return;
-      var d=savoDvib(m.name), val=savoPvib(g)*d; total+=val;
-      items.push({name:p.name.replace('Planta ','')+' · '+m.name, label:'Grado '+g, val:val});
-    } else { var t=parseFloat(m.tmax); if(isNaN(t)||t<85) return;
-      var dt=false; var ts=ev.filter(function(e){return e.t!=null;});
-      if(ts.length>=2) dt=ts[ts.length-1].t<ts[ts.length-2].t;
-      if(dt) return;
-      var dd=SAVO_T, vv=savoPtemp(t)*dd; total+=vv;
-      items.push({name:p.name.replace('Planta ','')+' · '+m.name, label:t.toFixed(0)+' °C', val:vv});
-    }
-  });});});
-  items.sort(function(x,y){return y.val-x.val;});
-  return {total:total, items:items};
-}
 function statBar(label,n){
   const tot=n.bueno+n.seg+n.alerta+n.peligro||1;const h=v=>Math.round(v/tot*130);
   return `<div class="bar"><div class="stack" style="height:130px">
@@ -2475,15 +2139,6 @@ function showEmailPreview(cid){
   </div></div>`;
   const d=document.createElement("div");d.id="modal";d.innerHTML=html;document.body.appendChild(d);
 }
-function sendReport(cid){
-  const rec=CONTACTS[cid]||[]; const cn=clientName(cid);
-  closeModal();
-  if(!rec.length){toast('Añade al menos un destinatario para '+cn+' antes de enviar.');return;}
-  toast('Informe de noviembre 2026 enviado a '+rec.length+' destinatario(s) de '+cn+' (demo).');
-}
-const TECH_REPORTS={
- "Vibración":[["Informe noviembre 2026","06/11/2026"],["Informe mayo 2026","20/05/2026"],["Informe febrero 2026","02/2026"],["Informe octubre 2025","10/2025"],["Informe julio 2025","07/2025"],["Informe mayo 2025","05/2025"],["Informe febrero 2025","02/2025"],["Informe noviembre 2024","11/2024"]]
-};
 const TECH_ICON_OF={'Vibraciones':'vib','Ultrasonidos':'ultra','Termografía':'ter','Sonido':'son','Alineación':'ali','Equilibrado':'equi','Aceites':'ace','Corriente':'mcsa','Eléctricos':'elec','Espesores':'esp'};
 function clientTechs(c){const set=[];scopedPlants(c).forEach(p=>p.areas.forEach(a=>a.machines.forEach(m=>(m.techs||[]).forEach(t=>{if(set.indexOf(t)<0)set.push(t);}))));return set;}
 // "sep.26" -> "Sep. 2026"
