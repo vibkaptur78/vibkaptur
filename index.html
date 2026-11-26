@@ -1839,17 +1839,8 @@ function renderUpload(){
       <b>💡 Carga inicial del histórico</b><p style="margin:6px 0 0;color:#2c4a63">La primera vez se suben en bloque los informes antiguos (PDF y fichas) y cada máquina arranca con su histórico dentro. A partir de ahí, solo subes el informe del mes , con vuestros propios formatos.</p>
     </div>
     <div class="card pad" style="margin-top:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><b>3 · ¿A quién le llega el aviso? (${cn})</b><button class="btn ghost sm" onclick="addContact('${cid}')">+ Añadir destinatario</button></div>
-      <p style="margin:0 0 10px;color:var(--muted);font-size:12.5px">Se añaden por nombre y correo la primera vez y <b>quedan guardados</b> para las siguientes. Puedes quitar los que ya no hagan falta con la ✕.</p>
-      <div style="display:grid;grid-template-columns:1.1fr 1.5fr 1fr auto;gap:8px;font-size:10.5px;color:var(--muted);letter-spacing:.5px;padding:0 2px 4px">
-        <span>NOMBRE</span><span>CORREO</span><span>ROL</span><span></span></div>
-      <div id="reclist">${rec.map((r,i)=>`
-        <div style="display:grid;grid-template-columns:1.1fr 1.5fr 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
-          <input value="${r.n}" placeholder="Nombre" onchange="setContact('${cid}',${i},'n',this.value)" style="padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px">
-          <input value="${r.e}" placeholder="correo@empresa.com" onchange="setContact('${cid}',${i},'e',this.value)" style="padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px">
-          <input value="${r.r||''}" placeholder="Rol" onchange="setContact('${cid}',${i},'r',this.value)" style="padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px">
-          <button class="btn ghost sm" onclick="rmContact('${cid}',${i})" title="Quitar destinatario">✕</button>
-        </div>`).join("")||'<div style="color:var(--muted);font-size:12.5px;padding:6px 0">Sin destinatarios todavía — añade el primero con su nombre y correo.</div>'}</div>
+      <b>3 · ¿A quién le llega el resumen? (${cn})</b>
+      ${destResumenLine(cid)}
     </div>
     <div class="card pad" style="margin-top:14px">
       <b>📊 Contador de descargas (${cn})</b>
@@ -1865,7 +1856,7 @@ function renderUpload(){
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--navy);color:#fff">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div><b style="color:#fff">4 · Resumen del informe para el cliente</b><p style="margin:4px 0 0;color:#cfe0ee;font-size:12.5px">El resumen sale solo al publicar: estado general, equipos más destacados, descarga del informe (PDF) y análisis estadístico. Aquí puedes verlo o volver a enviarlo sin subir nada de nuevo. En fase de prueba solo lo recibe Pedro.</p></div>
+        <div><b style="color:#fff">4 · Resumen del informe para el cliente</b><p style="margin:4px 0 0;color:#cfe0ee;font-size:12.5px">El resumen sale solo al publicar: estado general, equipos más destacados, descarga del informe (PDF) y análisis estadístico. Aquí puedes verlo o volver a enviarlo sin subir nada de nuevo. Se envía a los destinatarios del recuadro 3 solo si el envío al cliente está activado; si no, llega únicamente el aviso interno.</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn ghost" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)" onclick="showEmailPreview('${cid}')">Previsualizar resumen</button>
           <button class="btn" style="background:var(--green)" onclick="doReenviar('${cid}')">↻ Volver a enviar el resumen de ${cn} →</button>
@@ -1933,9 +1924,24 @@ function doBajaUser(email){
 }
 var DEST_SRV=null;
 function destPost(o){ const fd=new FormData(); fd.append('t',(session&&session.dlToken)||''); Object.keys(o).forEach(function(k){fd.append(k,o[k]);}); return fetch('/api/destinatarios.php',{method:'POST',body:fd}).then(function(r){return r.json();}); }
-function destSet(j){ if(j&&j.ok){ DEST_SRV={cfg:j.cfg||{},users:j.users||[]}; } else { DEST_SRV={cfg:{},users:[],err:(j&&j.e)||'error'}; } if(view&&view.name==='users') render(); }
+function destSet(j){ if(j&&j.ok){ DEST_SRV={cfg:j.cfg||{},users:j.users||[]}; } else { DEST_SRV={cfg:{},users:[],err:(j&&j.e)||'error'}; } if(view&&(view.name==='users'||view.name==='upload')) render(); }
 function loadDest(){ destPost({a:'get'}).then(destSet).catch(function(){ destSet({ok:false,e:'conexion'}); }); }
 function destCli(){ return window._destCli||''; }
+function destResumenLine(cid){
+  const st='margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.6';
+  if(!session||session.role!=='admin') return '<p style="'+st+'">Los destinatarios del resumen los gestiona administración.</p>';
+  if(DEST_SRV===null){ loadDest(); return '<p style="'+st+'">Cargando destinatarios…</p>'; }
+  const lnk=' <a style="color:var(--steel);cursor:pointer;text-decoration:underline" onclick="window._destCli=\''+cid+'\';go({name:\'users\'})">Cambiar en «Destinatarios del resumen»</a>';
+  if(DEST_SRV.err) return '<p style="'+st+'">No se ha podido leer la lista del servidor.'+lnk+'</p>';
+  const c=DATA.clients.find(function(x){return x.id===cid;}); const pls=(c&&c.plants)||[]; const multi=pls.length>1;
+  const pname=function(id){ const q=pls.find(function(x){return x.id===id;}); return q?q.name.replace('Planta ',''):id; };
+  const k=DEST_SRV.cfg[cid]||{}; const ex=k.extra||{}; const li=[];
+  DEST_SRV.users.filter(function(u){return u.c===cid;}).forEach(function(u){ li.push(uEsc(u.email)+((multi&&u.plant)?(' (solo '+uEsc(pname(u.plant))+')'):'')); });
+  Object.keys(ex).forEach(function(pk){ (ex[pk]||[]).forEach(function(e){ li.push(uEsc(e)+((multi&&pk!=='*')?(' (solo '+uEsc(pname(pk))+')'):'')); }); });
+  const estado=k.on?'<b style="color:var(--green)">Envío al cliente ACTIVADO.</b>':'<b>Envío al cliente desactivado:</b> ahora mismo el resumen solo llega como aviso interno.';
+  const quien=li.length?((k.on?'Lo reciben: ':'Cuando se active lo recibirán: ')+li.join(', ')+'.'):'Todavía no hay ningún destinatario en la lista.';
+  return '<p style="'+st+'">'+estado+' '+quien+lnk+'</p>';
+}
 function destPick(){ window._destCli=document.getElementById('destCli').value; render(); }
 function destOn(v){ const c=destCli(); if(!c) return; if(v && !confirm('Vas a ACTIVAR el envío automático al cliente. Desde ahora, cada vez que se publique o se reenvíe un informe de este cliente, el resumen saldrá a todos los destinatarios de la lista. Revisa antes que los correos son los correctos. ¿Activar?')) return; destPost({a:'on',c:c,v:v?'1':'0'}).then(destSet); }
 function destAdd(){ const c=destCli(); const e=(document.getElementById('destEmail').value||'').trim().toLowerCase(); const p=(document.getElementById('destPlanta')||{}).value||''; if(!c||!e) return; destPost({a:'add',c:c,p:p,email:e}).then(function(j){ if(j&&j.ok) destSet(j); else alert('No se pudo: '+({email:'el correo no es válido',write:'el servidor no ha podido guardarlo',muchos:'demasiados correos en esa lista'}[(j&&j.e)]||((j&&j.e)||'error'))); }); }
