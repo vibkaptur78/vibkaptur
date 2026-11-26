@@ -840,7 +840,8 @@ function pwForgotSend(){
     else pwMsg(PW_ERR[(j&&j.e)]||'No se ha podido enviar. Inténtalo de nuevo.');
   });
 }
-function pwNewFields(){ return '<input id="pwN1" type="password" autocomplete="new-password" placeholder="Contraseña nueva" style="'+PW_IN+'"><input id="pwN2" type="password" autocomplete="new-password" placeholder="Repite la contraseña nueva" style="'+PW_IN+'"><div style="font-size:11.5px;color:#64748b;margin:-2px 2px 4px">Mínimo 10 caracteres, con letras y números.</div>'; }
+function pwShow(c){ document.querySelectorAll('#pwModal input[id^=pw]').forEach(function(i){ if(i.type==='password'||i.type==='text'){ if(i.id!=='pwEmail') i.type=c.checked?'text':'password'; } }); }
+function pwNewFields(){ return '<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#475569;margin:0 2px 9px;cursor:pointer"><input type="checkbox" onchange="pwShow(this)" style="width:15px;height:15px;cursor:pointer"> Ver lo que escribo</label><input id="pwN1" type="password" autocomplete="new-password" placeholder="Contraseña nueva" style="'+PW_IN+'"><input id="pwN2" type="password" autocomplete="new-password" placeholder="Repite la contraseña nueva" style="'+PW_IN+'"><div style="font-size:11.5px;color:#64748b;margin:-2px 2px 4px">Mínimo 10 caracteres, con letras y números.</div>'; }
 function pwCheckNew(){ const a=document.getElementById('pwN1').value, b=document.getElementById('pwN2').value; if(a!==b){ pwMsg('Las dos contraseñas nuevas no coinciden.'); return null; } if(a.length<10||!/[A-Za-z]/.test(a)||!/[0-9]/.test(a)){ pwMsg(PW_ERR.debil); return null; } return a; }
 function pwChange(){
   pwModal('Cambiar mi contraseña','<form onsubmit="pwChangeSend();return false"><input id="pwAct" type="password" autocomplete="current-password" placeholder="Contraseña actual" style="'+PW_IN+'">'+pwNewFields()+PW_BT+'Cambiar contraseña</button></div></form>');
