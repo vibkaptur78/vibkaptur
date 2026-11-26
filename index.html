@@ -719,6 +719,7 @@ function renderLogin(){
         </label>
         <div id="loginErr" style="color:#d23b3b;font-size:11.5px;min-height:14px;margin:6px 2px 0"></div>
         <button type="submit" class="cta" style="width:100%;margin-top:4px">Entrar</button>
+        <div style="text-align:center;margin-top:10px"><a onclick="pwForgot()" style="color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline">¿Has olvidado tu contraseña?</a></div>
       </form>
     </div>
     <div class="tech-col">${col(right)}</div>
@@ -812,6 +813,60 @@ function doLogin(){
     .catch(function(){ fail('Error de conexión.'); });
 }
 function scopedPlants(c){ if(!c||!c.plants) return []; return (session && session.plantId)? c.plants.filter(p=>p.id===session.plantId) : c.plants; }
+/* ===== Contraseñas: cambiar la propia y recuperarla por correo ===== */
+function pwCall(o){ return fetch('/api/miclave.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)}).then(function(r){return r.json();}).catch(function(){return {ok:false,e:'conexion'};}); }
+const PW_ERR={actual:'La contraseña actual no es correcta.',debil:'La contraseña nueva debe tener al menos 10 caracteres, con letras y números.',igual:'La contraseña nueva es igual que la actual.',enlace:'El enlace no es válido o ha caducado. Pide uno nuevo desde «¿Has olvidado tu contraseña?».',token:'Sesión no válida, vuelve a entrar.',exp:'Sesión caducada, vuelve a entrar.',sesion:'Sesión no válida, vuelve a entrar.',write:'El servidor no ha podido guardar el cambio.',conexion:'Error de conexión.'};
+function pwClose(){ const m=document.getElementById('pwModal'); if(m) m.remove(); }
+function pwModal(title,inner){
+  pwClose(); const d=document.createElement('div'); d.id='pwModal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(10,25,41,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:14px;max-width:400px;width:100%;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-family:inherit"><div style="font-weight:800;font-size:16px;color:#0d2d46;margin-bottom:12px">'+title+'</div>'+inner+'<div id="pwMsg" style="font-size:12.5px;min-height:16px;margin:10px 2px 0;color:#d23b3b;line-height:1.5"></div></div>';
+  d.addEventListener('mousedown',function(e){ if(e.target===d) pwClose(); });
+  document.body.appendChild(d); const f=d.querySelector('input'); if(f) f.focus();
+}
+const PW_IN='width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #d5dde5;border-radius:9px;font-size:13px;margin-bottom:9px';
+const PW_BT='<div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="btn ghost sm" style="flex:1" onclick="pwClose()">Cancelar</button><button type="submit" class="btn" style="flex:2">';
+function pwMsg(t,ok){ const e=document.getElementById('pwMsg'); if(e){ e.style.color=ok?'#0d6b3a':'#d23b3b'; e.innerHTML=t; } }
+function pwForgot(){
+  const em=(document.getElementById('loginEmail')||{}).value||'';
+  pwModal('Recuperar contraseña','<p style="font-size:13px;color:#475569;line-height:1.5;margin:0 0 12px">Escribe el correo con el que entras en VIBKAPTUR y te enviaremos un enlace para crear una contraseña nueva.</p><form onsubmit="pwForgotSend();return false"><input id="pwEmail" type="email" autocomplete="username" placeholder="Correo electrónico" value="'+uEsc(em)+'" style="'+PW_IN+'">'+PW_BT+'Enviar enlace</button></div></form>');
+}
+function pwForgotSend(){
+  const e=(document.getElementById('pwEmail').value||'').trim().toLowerCase();
+  if(!e||e.indexOf('@')<1){ pwMsg('Escribe tu correo.'); return; }
+  pwMsg('Enviando…',true);
+  pwCall({a:'pedir',email:e}).then(function(j){
+    if(j&&j.ok) pwMsg('Si ese correo tiene acceso a VIBKAPTUR, en unos minutos recibirás un enlace para crear una contraseña nueva. Mira también en la carpeta de spam. El enlace caduca en 1 hora.',true);
+    else pwMsg(PW_ERR[(j&&j.e)]||'No se ha podido enviar. Inténtalo de nuevo.');
+  });
+}
+function pwNewFields(){ return '<input id="pwN1" type="password" autocomplete="new-password" placeholder="Contraseña nueva" style="'+PW_IN+'"><input id="pwN2" type="password" autocomplete="new-password" placeholder="Repite la contraseña nueva" style="'+PW_IN+'"><div style="font-size:11.5px;color:#64748b;margin:-2px 2px 4px">Mínimo 10 caracteres, con letras y números.</div>'; }
+function pwCheckNew(){ const a=document.getElementById('pwN1').value, b=document.getElementById('pwN2').value; if(a!==b){ pwMsg('Las dos contraseñas nuevas no coinciden.'); return null; } if(a.length<10||!/[A-Za-z]/.test(a)||!/[0-9]/.test(a)){ pwMsg(PW_ERR.debil); return null; } return a; }
+function pwChange(){
+  pwModal('Cambiar mi contraseña','<form onsubmit="pwChangeSend();return false"><input id="pwAct" type="password" autocomplete="current-password" placeholder="Contraseña actual" style="'+PW_IN+'">'+pwNewFields()+PW_BT+'Cambiar contraseña</button></div></form>');
+}
+function pwChangeSend(){
+  const n=pwCheckNew(); if(!n) return;
+  pwMsg('Guardando…',true);
+  pwCall({a:'cambiar',t:(session&&session.dlToken)||'',actual:document.getElementById('pwAct').value,nueva:n}).then(function(j){
+    if(j&&j.ok&&j.token){ session.dlToken=j.token; try{ if(localStorage.getItem('vibk_session')) localStorage.setItem('vibk_session',JSON.stringify(session)); }catch(e){} pwClose(); toast('✅ Contraseña cambiada.'); }
+    else pwMsg(PW_ERR[(j&&j.e)]||'No se ha podido cambiar.');
+  });
+}
+var PENDING_RESET=(function(){ try{ var q=new URLSearchParams(location.search); var r=q.get('reset'), e=q.get('e'); return (r&&e)?{t:r,e:e.toLowerCase()}:null; }catch(x){ return null; } })();
+function pwResetOpen(){
+  if(!PENDING_RESET) return;
+  pwModal('Crear una contraseña nueva','<p style="font-size:13px;color:#475569;line-height:1.5;margin:0 0 12px">Cuenta: <b>'+uEsc(PENDING_RESET.e)+'</b></p><form onsubmit="pwResetSend();return false">'+pwNewFields()+PW_BT+'Guardar contraseña</button></div></form>');
+}
+function pwResetSend(){
+  const n=pwCheckNew(); if(!n) return;
+  pwMsg('Guardando…',true);
+  pwCall({a:'reset',email:PENDING_RESET.e,token:PENDING_RESET.t,nueva:n}).then(function(j){
+    if(j&&j.ok){ const e=PENDING_RESET.e; PENDING_RESET=null; try{ history.replaceState(null,'',location.pathname); localStorage.removeItem('vibk_session'); localStorage.setItem('vibk_email',e); }catch(x){} session=null; pwClose(); render(); toast('✅ Contraseña creada. Ya puedes entrar con ella.'); }
+    else pwMsg(PW_ERR[(j&&j.e)]||'No se ha podido guardar.');
+  });
+}
+
 function logout(){ try{localStorage.removeItem('vibk_session');}catch(e){} session=null; go({name:"plants"}); }
 
 /* ============================================================= HEADER */
@@ -841,6 +896,7 @@ function renderHeader(){
     <nav>${nav}</nav>
     <div class="whoami">
       <span class="role ${isAdmin||isTec?'admin':''}">${isAdmin?'ADMIN · Ingenor':isTec?'TÉCNICO · Ingenor':(session.plantName?(session.name+' · '+session.plantName.replace('Planta ','')):(session.name+' · '+(session.puesto||'Dirección')))}</span>
+      <button class="btn ghost sm" style="color:#fff;border-color:#2c4c6b" onclick="pwChange()" title="Cambiar mi contraseña">🔑 Mi contraseña</button>
       <button class="btn ghost sm" style="color:#fff;border-color:#2c4c6b" onclick="logout()">Salir</button>
     </div>
   </header>`;
@@ -2462,6 +2518,7 @@ function render(){
   $("#app").innerHTML=renderHeader()+body;
 }
 // Arranque: si hay sesión recordada, cargar sus datos del servidor antes de pintar
+if(PENDING_RESET){ session=null; render(); pwResetOpen(); } else
 if(session && session.dlToken){
   loadClientData(session.dlToken).then(function(){ render(); tryPendingDL(); })
     .catch(function(){ try{localStorage.removeItem('vibk_session');}catch(e){} session=null; render(); });
