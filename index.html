@@ -267,9 +267,35 @@ function sendAviso(payload){
     .then(r=>r.ok?r.json():r.text().then(t=>({error:r.status,detail:t}))).catch(e=>({error:String(e)}));
 }
 /* Construye el HTML del aviso de revisión (correo al equipo técnico + Pedro). */
-let DLSTATS=(function(){ try{const v=localStorage.getItem('ingenor_dl'); if(v) return JSON.parse(v);}catch(e){} return {}; })();
-function saveDL(){ try{localStorage.setItem('ingenor_dl',JSON.stringify(DLSTATS));}catch(e){} }
-function recordDownload(cid,who){ if(!cid)return; DLSTATS[cid]=DLSTATS[cid]||{count:0,people:{}}; DLSTATS[cid].count++; DLSTATS[cid].people[who]=(DLSTATS[cid].people[who]||0)+1; DLSTATS[cid].last=new Date().toLocaleString('es-ES'); saveDL(); }
+/* Descargas reales de informes: las registra el servidor (clientes con sesion y enlaces del correo) */
+var DL_SRV={};
+function loadDl(cid){
+  if(!cid||!session||!session.dlToken||DL_SRV[cid]) return;
+  DL_SRV[cid]={d:null};
+  fetch('/api/descargas.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid})})
+    .then(function(r){return r.json();}).then(function(j){ DL_SRV[cid]={d:(j&&j.ok)?j:{err:true}}; try{ if(view&&view.name==='upload') render(); }catch(e){} })
+    .catch(function(){ DL_SRV[cid]={d:{err:true}}; });
+}
+function dlFecha(ts){ if(!ts) return '—'; var d=new Date(ts*1000), z=function(n){return ('0'+n).slice(-2);}; return z(d.getDate())+'/'+z(d.getMonth()+1)+'/'+d.getFullYear()+' '+z(d.getHours())+':'+z(d.getMinutes()); }
+function dlCard(cid){
+  var st='color:var(--muted);font-size:12.5px;padding:4px 0';
+  if(!session||session.role!=='admin') return '<div style="'+st+'">Las descargas del cliente las ve administración.</div>';
+  var A=DL_SRV[cid]; if(!A){ loadDl(cid); return '<div style="'+st+'">Cargando descargas…</div>'; }
+  var D=A.d; if(!D) return '<div style="'+st+'">Cargando descargas…</div>';
+  if(D.err) return '<div style="'+st+'">No se han podido leer las descargas del servidor.</div>';
+  if(!D.total) return '<div style="'+st+'">Todavía nadie de este cliente ha descargado un informe.</div>';
+  var c=DATA.clients.find(function(x){return x.id===cid;}); var pls=(c&&c.plants)||[]; var multi=pls.length>1;
+  var pname=function(id){ var q=pls.find(function(x){return x.id===id;}); return q?q.name.replace('Planta ',''):id; };
+  var conU=D.personas.filter(function(x){return x.w!=='';}).length;
+  var filas=D.personas.map(function(x){ var quien=x.w===''?'Desde el enlace del correo':(uEsc(x.name||x.w)+(x.name?(' <span style="color:var(--muted)">· '+uEsc(x.w)+'</span>'):'')+(x.baja?' <span style="color:var(--muted)">(dado de baja)</span>':'')); return '<tr><td>'+quien+'</td><td style="text-align:right"><b>'+x.n+'</b></td><td style="text-align:right;color:var(--muted)">'+dlFecha(x.last)+'</td></tr>'; }).join('');
+  var infs=(D.informes||[]).map(function(x){ var nom=(x.k==='termo'?'Termografía':'Vibraciones')+((multi&&x.p)?(' · '+uEsc(pname(x.p))):'')+(x.m?(' · '+periodLabel(x.m)):''); return '<tr><td>'+nom+'</td><td style="text-align:right"><b>'+x.n+'</b></td><td style="text-align:right;color:var(--muted)">'+dlFecha(x.last)+'</td></tr>'; }).join('');
+  return '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">'
+    +'<div class="card pad" style="text-align:center;flex:1;min-width:120px"><div style="font-size:24px;font-weight:800;color:var(--navy)">'+D.total+'</div><small style="color:var(--muted)">descargas</small></div>'
+    +'<div class="card pad" style="text-align:center;flex:1;min-width:120px"><div style="font-size:24px;font-weight:800;color:var(--green)">'+conU+'</div><small style="color:var(--muted)">usuarios distintos</small></div></div>'
+    +'<table style="font-size:12.5px"><thead><tr><th>Quién</th><th style="text-align:right">Descargas</th><th style="text-align:right">Última</th></tr></thead><tbody>'+filas+'</tbody></table>'
+    +'<table style="font-size:12.5px;margin-top:12px"><thead><tr><th>Informe</th><th style="text-align:right">Descargas</th><th style="text-align:right">Última</th></tr></thead><tbody>'+infs+'</tbody></table>'
+    +'<p style="font-size:11px;color:var(--muted);margin:8px 2px 0">Cuenta desde el '+dlFecha(D.desde).slice(0,10)+'. No incluye las descargas del personal de Ingenor.</p>';
+}
 /* Informe completo: lo sirve la plataforma tras el login, desde una carpeta protegida,
    con un token firmado por el servidor (caduca a las 12h). Técnicos: sin token. */
 function doUpload(cid){
@@ -612,7 +638,6 @@ function doDownload(){
   if(session&&session.canDownload===false){ toast('La descarga del informe es exclusiva del cliente y de administración.'); return; }
   var c=(session&&session.role==='client')?session.clientId:((OV&&OV.c)||(view&&view.cid)||curClient||(session&&session.clientId)||'elis');
   if(!(session&&session.dlToken)){ toast('Preparando la descarga… espera un segundo y vuelve a pulsar.'); return; }
-  if(session.role==='client') recordDownload(session.clientId, session.name+(session.plantName?(' · '+session.plantName.replace('Planta ','')):(' · '+(session.puesto||''))));
   var pl=(session&&session.plantId)||(OV?OV.p:((view&&view.pid)||''));
   var url='/api/informe.php?c='+encodeURIComponent(c)+'&t='+encodeURIComponent(session.dlToken)+(pl?('&p='+encodeURIComponent(pl)):'')+((OV&&OV.m)?('&m='+encodeURIComponent(OV.m)):'');
   var fname=reportFilename(c); if(OV&&OV.m) fname=fname.replace(/(_[A-Z][a-z]{2}\d{2,4})?\.pdf$/,'_'+perShort(OV.m)+'.pdf');
@@ -1570,16 +1595,9 @@ function renderUpload(){
       ${destResumenLine(cid)}
     </div>
     <div class="card pad" style="margin-top:14px">
-      <b>📊 Contador de descargas (${cn})</b>
-      <p style="margin:4px 0 10px;color:var(--muted);font-size:12.5px">Como administrador ves si el cliente ha descargado el informe y cuánta gente lo ha hecho — para saber si hay interés real.</p>
-      ${(function(){const st=DLSTATS[cid];if(!st||!st.count)return '<div style="color:var(--muted);font-size:12.5px;padding:4px 0">Todavía nadie de este cliente ha descargado el informe.</div>';
-        const ppl=Object.keys(st.people);
-        return `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
-          <div class="card pad" style="text-align:center;flex:1;min-width:120px"><div style="font-size:24px;font-weight:800;color:var(--navy)">${st.count}</div><small style="color:var(--muted)">descargas</small></div>
-          <div class="card pad" style="text-align:center;flex:1;min-width:120px"><div style="font-size:24px;font-weight:800;color:var(--green)">${ppl.length}</div><small style="color:var(--muted)">personas distintas</small></div>
-        </div>
-        <table style="font-size:12.5px"><thead><tr><th>Quién</th><th style="text-align:right">Descargas</th></tr></thead><tbody>${ppl.map(p=>`<tr><td>${p}</td><td style="text-align:right"><b>${st.people[p]}</b></td></tr>`).join('')}</tbody></table>
-        <p style="font-size:11px;color:var(--muted);margin:8px 2px 0">Última descarga: ${st.last||'—'}</p>`;})()}
+      <b>📊 Descargas del cliente (${cn})</b>
+      <p style="margin:4px 0 10px;color:var(--muted);font-size:12.5px">Quién de este cliente ha descargado los informes y cuándo, registrado por el servidor: tanto desde la plataforma como desde el enlace del correo.</p>
+      ${dlCard(cid)}
     </div>
     <div class="card pad" style="margin-top:14px;background:var(--navy);color:#fff">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
