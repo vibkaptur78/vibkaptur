@@ -2524,7 +2524,7 @@ function dlBtn(label){label=label||'Descargar';
 }
 function toast(msg){
   let t=document.getElementById('toast');
-  if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#0f2a43;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);z-index:9999;font-size:13px;max-width:86%;text-align:center;transition:opacity .3s';document.body.appendChild(t);}
+  if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#0f2a43;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);z-index:9999;font-size:13px;max-width:86%;text-align:center;transition:opacity .3s;pointer-events:none';document.body.appendChild(t);}
   t.textContent=msg;t.style.opacity='1';
   clearTimeout(window._tt);window._tt=setTimeout(()=>{t.style.opacity='0';},2800);
 }
