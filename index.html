@@ -346,10 +346,43 @@ function doRevisarTermo(cid){
      }
    }).catch(function(){ msg('Word recibido, pero hubo un error de conexión al revisarlo.'); });
 }
-function doDownloadTermo(cid,pid){
+function doDownloadTermo(cid,pid,m){
   if(session&&session.canDownload===false){ toast('La descarga del informe es exclusiva del cliente y de administración.'); return; }
   if(!(session&&session.dlToken)){ toast('Preparando la descarga… espera un segundo y vuelve a pulsar.'); return; }
-  window.location.href='/api/termodl.php?t='+encodeURIComponent(session.dlToken)+'&c='+encodeURIComponent(cid)+(pid?('&p='+encodeURIComponent(pid)):'');
+  window.location.href='/api/termodl.php?t='+encodeURIComponent(session.dlToken)+'&c='+encodeURIComponent(cid)+(pid?('&p='+encodeURIComponent(pid)):'')+(m?('&m='+encodeURIComponent(m)):'');
+}
+/* Informes en PDF que hay de verdad en el servidor: solo esos tienen boton */
+var REP_AV={};
+function loadReps(cid){
+  if(!cid||!session||!session.dlToken||REP_AV[cid]) return;
+  REP_AV[cid]={r:null};
+  fetch('/api/informes.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:session.dlToken,c:cid})})
+    .then(function(r){return r.json();}).then(function(j){ REP_AV[cid]={r:(j&&j.ok&&j.r)?j.r:{}}; try{ if(view&&(view.name==='tecnicas'||view.name==='machine')) render(); }catch(e){} })
+    .catch(function(){ REP_AV[cid]={r:{}}; });
+}
+function repMonths(c,p,kind){
+  if(!c||!p) return [];
+  var A=REP_AV[c.id]; if(!A){ loadReps(c.id); return null; } if(!A.r) return null;
+  var e=A.r[p.id]; if(!e && (c.plants||[]).length<=1) e=A.r[''];
+  if(!e) return [];
+  var L=((kind==='termo'?e.t:e.v)||[]).map(function(m){ return {m:m,lab:periodLabel(m),n:qNum(m)}; });
+  if(kind!=='termo' && e.vc && !L.length){ var q=plantPeriods(p,'vib')[0]; L.push({m:'',lab:q?periodLabel(q):'último informe',n:0}); }
+  L.sort(function(a,b){return b.n-a.n;});
+  return L;
+}
+function repBtn(cid,pid,kind,m,label){
+  if(session&&session.canDownload===false) return dlBtn(label);
+  return '<button class="btn ghost sm" onclick="doDownloadRep(\''+cid+'\',\''+pid+'\',\''+kind+'\',\''+m+'\')">'+(label||'Descargar')+'</button>';
+}
+function doDownloadRep(cid,pid,kind,m){
+  if(kind==='termo'){ var c=DATA.clients.find(function(x){return x.id===cid;}); doDownloadTermo(cid,(c&&(c.plants||[]).length>1)?pid:'',m); return; }
+  DL_OVR={c:cid,p:pid,m:m}; doDownload();
+}
+function curRepRow(c,p,kind,title){
+  var L=repMonths(c,p,kind), st='color:var(--muted);font-size:12.5px;background:#f8fafc;border-radius:8px;padding:10px 12px';
+  if(L===null) return '<div style="'+st+'">Comprobando informes…</div>';
+  if(!L.length) return '<div style="'+st+'">Todavía no hay informe en PDF de esta planta en la plataforma.</div>';
+  return '<div class="rep"><div class="ic">PDF</div><div class="meta"><b>'+title+' · '+L[0].lab+'</b><span>Descarga en PDF</span></div>'+repBtn(c.id,p.id,kind,L[0].m)+'</div>';
 }
 function doUploadTermoPdf(cid){
   if(!upReady(cid)) return;
@@ -399,7 +432,7 @@ function doPublicarTermo(cid,force,okDest,soloReenvio){
          };
          if(RS){ sendResumenCliente(cid,pid,RS.subject,RS.html,false).then(interno); } else interno(null);
        };
-       if(!re_){ loadClientData(session.dlToken).then(fin).catch(fin); } else fin();
+       delete REP_AV[cid]; if(!re_){ loadClientData(session.dlToken).then(fin).catch(fin); } else fin();
      }).catch(function(){ msg('Error de conexión al publicar.'); });
   };
   if(soloReenvio){
@@ -584,7 +617,7 @@ function doPublicar(cid,force,okDest){
              .then(function(r){return r.json();}).then(function(x){ enviar((x&&x.ok&&x.url)||''); }).catch(function(){ enviar(''); });
          } else enviar('');
        };
-       if(D&&D.ok){ loadClientData(session.dlToken).then(fin).catch(fin); } else fin();
+       delete REP_AV[cid]; if(D&&D.ok){ loadClientData(session.dlToken).then(fin).catch(fin); } else fin();
      }
      else {
        var e=(j&&j.e)||'error';
@@ -621,12 +654,12 @@ function doDownload(){
   if(!(session&&session.dlToken)){ toast('Preparando la descarga… espera un segundo y vuelve a pulsar.'); return; }
   if(session.role==='client') recordDownload(session.clientId, session.name+(session.plantName?(' · '+session.plantName.replace('Planta ','')):(' · '+(session.puesto||''))));
   var pl=(session&&session.plantId)||(OV?OV.p:((view&&view.pid)||''));
-  var url='/api/informe.php?c='+encodeURIComponent(c)+'&t='+encodeURIComponent(session.dlToken)+(pl?('&p='+encodeURIComponent(pl)):'');
-  var fname=reportFilename(c);
+  var url='/api/informe.php?c='+encodeURIComponent(c)+'&t='+encodeURIComponent(session.dlToken)+(pl?('&p='+encodeURIComponent(pl)):'')+((OV&&OV.m)?('&m='+encodeURIComponent(OV.m)):'');
+  var fname=reportFilename(c); if(OV&&OV.m) fname=fname.replace(/(_[A-Z][a-z]{2}\d{2,4})?\.pdf$/,'_'+perShort(OV.m)+'.pdf');
   fetch(url).then(function(r){ if(!r.ok) throw new Error('nd'); return r.blob(); }).then(function(b){
     var u=URL.createObjectURL(b); var a=document.createElement('a'); a.href=u; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(u);},1500);
     if(session.role==='client') toast('Descargando '+fname+'. Tu descarga queda registrada para Ingenor.');
-  }).catch(function(){ toast('Informe no disponible todavía para esta planta.'); });
+  }).catch(function(){ toast('Ese informe no está disponible en la plataforma.'); });
 }
 function clientName(cid){const c=DATA.clients.find(x=>x.id===cid);return c?c.name:cid;}
 var uploadPid='';
@@ -1133,7 +1166,7 @@ function renderMachineTermo(c,p,m){
       <div style="display:flex;gap:18px;font-size:11.5px;color:var(--muted);margin-top:8px">${m.evo.some(e=>e.g!=null)?'<span><span style=\'display:inline-block;width:18px;height:3px;background:#1e6fb0;vertical-align:middle\'></span> Grado (0–10)</span>':''}<span><span style="display:inline-block;width:18px;height:0;border-top:2px ${m.evo.some(e=>e.g!=null)?'dashed':'solid'} #0d9488;vertical-align:middle"></span> Tª máxima (°C)</span></div>
     </div>`:''}
     <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Informe</b><p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Informe de termografía completo en PDF, descargable.</p>
-      <div class="rep"><div class="ic">PDF</div><div class="meta"><b>Informe termografía — ${p.name}${(p.termo&&p.termo.periodo)?(' · '+p.termo.periodo.replace('-','. 20')):' · sep. 2026'}</b><span>${(p.termo&&p.termo.fecha)||'25/09/2026'}</span></div>${(p.termo&&p.termo.periodo)?((session&&session.canDownload===false)?dlBtn():`<button class="btn ghost sm" onclick="doDownloadTermo('${c.id}','${((c.plants||[]).length>1)?p.id:''}')">Descargar</button>`):dlBtn()}</div>
+      ${curRepRow(c,p,'termo','Informe termografía — '+p.name)}
     </div>
   </main>`;
 }
@@ -1619,7 +1652,7 @@ function renderMachineVib(c,p,m){
       <div style="font-size:11.5px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:18px;height:3px;background:#1e6fb0;vertical-align:middle"></span> Grado de severidad (0–10)</div>
     </div>`:''}
     <div class="card pad" style="margin-top:14px"><b style="font-size:14px">Informe</b><p style="color:var(--muted);font-size:12px;margin:4px 0 8px">Ficha de vibraciones con espectros y tendencia, en el informe completo.</p>
-      <div class="rep"><div class="ic">PDF</div><div class="meta"><b>Informe vibraciones — ${p.name} · sep. 2026</b><span>24/09/2026</span></div>${dlBtn()}</div>
+      ${curRepRow(c,p,'vib','Informe vibraciones — '+p.name)}
     </div>
   </main>`;
 }
@@ -1726,8 +1759,7 @@ function renderMachine(){
   out+=`</div>`;
   out+=`<div class="card pad" style="margin-top:14px"><b style="font-size:14px">Informe</b><p style="color:var(--muted);font-size:12px;margin:4px 0 8px">El informe completo en PDF, descargable.</p><div style="margin-top:4px">`;
   const _reps=m.reports||[];
-  if(_reps.length) _reps.forEach(r=>out+=`<div class="rep"><div class="ic ${r.f==='xls'?'xls':''}">${r.f.toUpperCase()}</div><div class="meta"><b>${r.t}</b><span>${r.d}</span></div>${dlBtn()}</div>`);
-  else out+=`<div class="rep"><div class="ic">PDF</div><div class="meta"><b>Informe del cliente</b><span>Descarga en PDF</span></div>${dlBtn()}</div>`;
+  out+=curRepRow(c,p,'vib','Informe vibraciones — '+p.name);
   out+=`</div></div></main>`;
   return out;
 }
@@ -2459,10 +2491,10 @@ function plantPeriods(p,kind){
   return set;
 }
 function techReports(c,tech){
-  const kind=(tech==='Termografía')?'termo':(tech==='Vibraciones'||tech==='Ultrasonidos')?'vib':null;
-  if(!kind) return TECH_REPORTS[tech]||[];
+  const kind=(tech==='Termografía')?'termo':(tech==='Vibraciones'||tech==='Vibración'||tech==='Ultrasonidos')?'vib':null;
+  if(!kind||!c) return [];
   const r=[];
-  scopedPlants(c).forEach(p=>{const pn=p.name.replace('Planta ','');plantPeriods(p,kind).forEach(q=>{const L=periodLabel(q);r.push(['Informe '+tech.toLowerCase()+' — '+pn+' · '+L,L]);});});
+  scopedPlants(c).forEach(p=>{const pn=p.name.replace('Planta ','');(repMonths(c,p,kind)||[]).forEach(x=>{r.push(['Informe '+tech.toLowerCase()+' — '+pn+' · '+x.lab,x.lab,{k:kind,p:p.id,m:x.m}]);});});
   return r;
 }
 function renderTecnicas(){
@@ -2471,13 +2503,13 @@ function renderTecnicas(){
   const techs = isAdmin ? TECH_ICONS.map(t=>t[1]) : clientTechs(_cli);
   const ICONS = techs.map(name=>[TECH_ICON_OF[name]||'end', name]);
   const cards=ICONS.map(t=>{
-    const reps = isAdmin ? (TECH_REPORTS[t[1]]||[]) : techReports(_cli,t[1]);
+    const reps = techReports(_cli,t[1]);
     return `<div class="card pad">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="width:46px;height:46px;border-radius:12px;background:var(--steel-soft);color:var(--green);display:flex;align-items:center;justify-content:center">${techIcon(t[0])}</div>
         <div><b style="font-size:15px">${t[1]}</b><div style="color:var(--muted);font-size:12px">${reps.length?reps.length+" informes disponibles":"Sin informes todavía"}</div></div>
       </div>
-      ${reps.length?`<div style="margin-top:12px">`+reps.map(r=>`<div class="rep"><div class="ic">PDF</div><div class="meta"><b>${r[0]}</b><span>${r[1]}</span></div>${dlBtn('Abrir')}</div>`).join("")+`</div>`:`<div style="margin-top:10px;color:var(--muted);font-size:12.5px;background:#f8fafc;border-radius:8px;padding:10px 12px">Ingenor subirá aquí los informes de ${t[1].toLowerCase()} cuando se realice este servicio.</div>`}
+      ${reps.length?`<div style="margin-top:12px">`+reps.map(r=>`<div class="rep"><div class="ic">PDF</div><div class="meta"><b>${r[0]}</b><span>${r[1]}</span></div>${r[2]?repBtn(_cli.id,r[2].p,r[2].k,r[2].m,'Abrir'):dlBtn('Abrir')}</div>`).join("")+`</div>`:`<div style="margin-top:10px;color:var(--muted);font-size:12.5px;background:#f8fafc;border-radius:8px;padding:10px 12px">Ingenor subirá aquí los informes de ${t[1].toLowerCase()} cuando se realice este servicio.</div>`}
     </div>`;
   }).join("");
   return `<main>
